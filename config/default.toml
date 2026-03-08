@@ -5,6 +5,13 @@ telemetry = [
     "default.exp-tas.com",
     "cursor-user-debugging-data.s3.us-east-1.amazonaws.com",
     "statsig.cursor.sh",
+    "dc.services.visualstudio.com",
+    "snowplowprd.trx.gitlab.net",
+    "new-sentry.gitlab.net",
+    "otel.gitkraken.com",
+    "xp.atlassian.com",
+    "as.atlassian.com",
+    "api.agnost.ai",
 ]
 
 indexing = [
@@ -25,11 +32,13 @@ analytics = [
     "AnalyticsService/Track",
     "AiService/ReportClientNumericMetrics",
     "AiService/ReportCommitAiAnalytics",
+    "AiService/ReportAiCodeChangeMetrics",
     "AiService/UpdateVscodeProfile",
     "AiService/ReportUsageEvent",
     "AiService/RecordTelemetry",
     "InAppAdService",
     "IndexerService",
+    "CppService/RecordCppFate",
     "/tev1/",
     "/rgstr",
 ]

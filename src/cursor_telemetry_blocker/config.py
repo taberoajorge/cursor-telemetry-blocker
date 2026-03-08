@@ -9,6 +9,13 @@ BLOCKED_DOMAINS = {
     "repo42.cursor.sh",
     "api.turbopuffer.com",
     "statsig.cursor.sh",
+    "dc.services.visualstudio.com",
+    "snowplowprd.trx.gitlab.net",
+    "new-sentry.gitlab.net",
+    "otel.gitkraken.com",
+    "xp.atlassian.com",
+    "as.atlassian.com",
+    "api.agnost.ai",
 }
 
 BLOCKED_DOMAIN_PATTERNS = [
@@ -23,11 +30,13 @@ BLOCKED_GRPC_PATHS = [
     "AnalyticsService/Track",
     "AiService/ReportClientNumericMetrics",
     "AiService/ReportCommitAiAnalytics",
+    "AiService/ReportAiCodeChangeMetrics",
     "AiService/UpdateVscodeProfile",
     "AiService/ReportUsageEvent",
     "AiService/RecordTelemetry",
     "InAppAdService",
     "IndexerService",
+    "CppService/RecordCppFate",
     "/tev1/",
     "/rgstr",
 ]
