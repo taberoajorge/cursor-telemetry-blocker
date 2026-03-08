@@ -1,0 +1,10 @@
+[project]
+name = "cursor-telemetry-blocker"
+version = "0.1.0"
+description = "Local proxy to block Cursor IDE telemetry while preserving AI functionality"
+requires-python = ">=3.12"
+dependencies = [
+    "grpcio-tools>=1.78.0",
+    "mitmproxy>=12.2.1",
+    "protobuf>=6.33.5",
+]
