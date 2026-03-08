@@ -30,6 +30,7 @@ BLOCKED_GRPC_PATHS = [
     "AnalyticsService/BootstrapStatsig",
     "AnalyticsService/Track",
     "AnalyticsService/SubmitLogs",
+    "AnalyticsService/UploadIssueTrace",
     "MetricsService/ReportGauge",
     "MetricsService/ReportDistribution",
     "MetricsService/ReportIncrement",
