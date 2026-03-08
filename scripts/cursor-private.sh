@@ -8,21 +8,56 @@ PROXY_PORT=18080
 CONFDIR="$PROJECT_DIR/.mitmproxy"
 CA_CERT="$CONFDIR/mitmproxy-ca-cert.pem"
 MITM_PID_FILE="$PROJECT_DIR/.mitm.pid"
-CURSOR_BIN="/Applications/Cursor.app/Contents/MacOS/Cursor"
+
+OS_TYPE="$(uname -s)"
+
+detect_cursor_binary() {
+    case "$OS_TYPE" in
+        Darwin)
+            if [ -x "/Applications/Cursor.app/Contents/MacOS/Cursor" ]; then
+                echo "/Applications/Cursor.app/Contents/MacOS/Cursor"
+                return
+            fi
+            ;;
+        Linux)
+            for candidate in \
+                "/usr/bin/cursor" \
+                "$HOME/.local/bin/cursor" \
+                "/snap/bin/cursor" \
+                "/usr/share/cursor/cursor"; do
+                if [ -x "$candidate" ]; then
+                    echo "$candidate"
+                    return
+                fi
+            done
+            APPIMAGE=$(find "$HOME" -maxdepth 2 -name "Cursor*.AppImage" -type f 2>/dev/null | head -1)
+            if [ -n "$APPIMAGE" ]; then
+                echo "$APPIMAGE"
+                return
+            fi
+            ;;
+    esac
+    echo ""
+}
+
+CURSOR_BIN="$(detect_cursor_binary)"
 
 MODE="${1:-block}"
 
 case "$MODE" in
     observe)
         ADDON_SCRIPT="$SRC_DIR/observer.py"
+        LOG_FILE="$PROJECT_DIR/cursor_traffic.log"
         echo "=== OBSERVE mode (logging only, no blocking) ==="
         ;;
     block)
         ADDON_SCRIPT="$SRC_DIR/filter.py"
+        LOG_FILE="$PROJECT_DIR/cursor_blocker.log"
         echo "=== BLOCK mode (telemetry blocked, AI passes through) ==="
         ;;
     deep)
         ADDON_SCRIPT="$SRC_DIR/deep_filter.py"
+        LOG_FILE="$PROJECT_DIR/cursor_blocker_deep.log"
         echo "=== DEEP mode (block + strip repo names from gRPC protobuf) ==="
         ;;
     *)
@@ -36,27 +71,78 @@ esac
 
 if [ ! -f "$CA_CERT" ]; then
     echo "Error: CA cert not found at $CA_CERT"
-    echo "Run setup-ca-cert.sh first to install it in macOS Keychain."
+    echo "Run scripts/setup-ca-cert.sh first to generate and install it."
     exit 1
 fi
 
-if [ ! -x "$CURSOR_BIN" ]; then
-    echo "Error: Cursor binary not found at $CURSOR_BIN"
+if [ -z "$CURSOR_BIN" ] || [ ! -x "$CURSOR_BIN" ]; then
+    echo "Error: Cursor binary not found."
+    echo "Searched standard locations for $OS_TYPE."
     exit 1
 fi
 
-security find-certificate -c mitmproxy /Library/Keychains/System.keychain > /dev/null 2>&1 || {
-    echo ""
-    echo "WARNING: mitmproxy CA cert is NOT in the macOS System Keychain."
-    echo "Cursor will fail TLS handshakes through the proxy without it."
-    echo ""
-    echo "Run first:  bash setup-ca-cert.sh"
-    echo ""
-    read -p "Continue anyway? [y/N] " REPLY
-    if [[ ! "$REPLY" =~ ^[Yy]$ ]]; then
-        exit 1
-    fi
+verify_ca_cert() {
+    case "$OS_TYPE" in
+        Darwin)
+            security find-certificate -c mitmproxy /Library/Keychains/System.keychain > /dev/null 2>&1 || {
+                echo ""
+                echo "WARNING: mitmproxy CA cert is NOT in the macOS System Keychain."
+                echo "Cursor will fail TLS handshakes through the proxy without it."
+                echo ""
+                echo "Run first:  bash scripts/setup-ca-cert.sh"
+                echo ""
+                read -p "Continue anyway? [y/N] " REPLY
+                if [[ ! "$REPLY" =~ ^[Yy]$ ]]; then
+                    exit 1
+                fi
+            }
+            ;;
+        Linux)
+            if [ ! -f "/usr/local/share/ca-certificates/mitmproxy-ca-cert.crt" ] && \
+               [ ! -f "/etc/pki/ca-trust/source/anchors/mitmproxy-ca-cert.pem" ]; then
+                echo ""
+                echo "WARNING: mitmproxy CA cert may not be installed system-wide."
+                echo "Run first:  bash scripts/setup-ca-cert.sh"
+                echo ""
+                read -p "Continue anyway? [y/N] " REPLY
+                if [[ ! "$REPLY" =~ ^[Yy]$ ]]; then
+                    exit 1
+                fi
+            fi
+            ;;
+    esac
 }
+
+verify_ca_cert
+
+stop_cursor() {
+    case "$OS_TYPE" in
+        Darwin)
+            osascript -e 'tell application "Cursor" to quit' 2>/dev/null || true
+            sleep 2
+            REMAINING=$(pgrep -f "Cursor.app/Contents/MacOS/Cursor" 2>/dev/null || true)
+            if [ -n "$REMAINING" ]; then
+                echo "Force-killing remaining Cursor processes..."
+                pkill -f "Cursor.app/Contents" 2>/dev/null || true
+                sleep 2
+            fi
+            ;;
+        Linux)
+            pkill -f "cursor" 2>/dev/null || true
+            sleep 2
+            ;;
+    esac
+    echo "Cursor closed."
+}
+
+cursor_pgrep_pattern() {
+    case "$OS_TYPE" in
+        Darwin) echo "Cursor.app/Contents/MacOS/Cursor" ;;
+        Linux)  echo "cursor" ;;
+    esac
+}
+
+PGREP_PATTERN="$(cursor_pgrep_pattern)"
 
 cleanup() {
     echo ""
@@ -71,7 +157,7 @@ cleanup() {
 
 trap cleanup EXIT INT TERM
 
-EXISTING_CURSOR_PIDS=$(pgrep -f "Cursor.app/Contents/MacOS/Cursor" 2>/dev/null || true)
+EXISTING_CURSOR_PIDS=$(pgrep -f "$PGREP_PATTERN" 2>/dev/null || true)
 if [ -n "$EXISTING_CURSOR_PIDS" ]; then
     echo ""
     echo "Cursor is already running (without proxy)."
@@ -84,16 +170,7 @@ if [ -n "$EXISTING_CURSOR_PIDS" ]; then
     fi
 
     echo "Closing Cursor..."
-    osascript -e 'tell application "Cursor" to quit' 2>/dev/null || true
-    sleep 2
-
-    REMAINING=$(pgrep -f "Cursor.app/Contents/MacOS/Cursor" 2>/dev/null || true)
-    if [ -n "$REMAINING" ]; then
-        echo "Force-killing remaining Cursor processes..."
-        pkill -f "Cursor.app/Contents" 2>/dev/null || true
-        sleep 2
-    fi
-    echo "Cursor closed."
+    stop_cursor
 fi
 
 if [ -f "$MITM_PID_FILE" ]; then
@@ -142,7 +219,7 @@ if ! kill -0 "$CURSOR_PID" 2>/dev/null; then
     echo ""
     echo "Cursor process exited early. This can happen if another instance"
     echo "took over. Checking if Cursor is now running..."
-    RUNNING=$(pgrep -f "Cursor.app/Contents/MacOS/Cursor" 2>/dev/null || true)
+    RUNNING=$(pgrep -f "$PGREP_PATTERN" 2>/dev/null || true)
     if [ -n "$RUNNING" ]; then
         echo "Cursor is running but may not be using the proxy."
         echo "The proxy remains active on port $PROXY_PORT."
@@ -162,7 +239,7 @@ else
     echo ""
     echo "  Proxy:  http://127.0.0.1:$PROXY_PORT"
     echo "  Addon:  $(basename "$ADDON_SCRIPT")"
-    echo "  Logs:   tail -f $SCRIPT_DIR/cursor_blocker_deep.log"
+    echo "  Logs:   tail -f $LOG_FILE"
     echo ""
     echo "Press Ctrl+C to stop the proxy. Cursor will continue without it."
     echo ""

@@ -24,8 +24,19 @@ sudo tee -a "$HOSTS_FILE" > /dev/null <<'HOSTS_BLOCK'
 HOSTS_BLOCK
 
 echo "Flushing DNS cache..."
-sudo dscacheutil -flushcache
-sudo killall -HUP mDNSResponder 2>/dev/null || true
+OS_TYPE="$(uname -s)"
+case "$OS_TYPE" in
+    Darwin)
+        sudo dscacheutil -flushcache
+        sudo killall -HUP mDNSResponder 2>/dev/null || true
+        ;;
+    Linux)
+        if command -v systemd-resolve > /dev/null 2>&1; then
+            sudo systemd-resolve --flush-caches
+        elif command -v resolvectl > /dev/null 2>&1; then
+            sudo resolvectl flush-caches
+        fi
+        ;;
+esac
 
 echo "Done. Telemetry domains are now blocked."
-echo "To verify: dscacheutil -q host -a name metrics.cursor.sh"
