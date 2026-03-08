@@ -120,40 +120,32 @@ install_launchagent() {
         exit 1
     fi
 
-    # Ensure dependencies are installed
     (cd "$PROJECT_DIR" && "$uv_bin" sync --quiet 2>/dev/null || true)
 
-    # Detect if Homebrew mitmproxy supports transparent mode
     install_mitmproxy_if_missing
 
-    local mitmdump_bin
-    mitmdump_bin="$(detect_mitmdump)"
-
-    local has_local_mode=false
-    if [ -n "$mitmdump_bin" ] && "$mitmdump_bin" --help 2>&1 | grep -q "local"; then
-        has_local_mode=true
+    local local_env="$PROJECT_DIR/config/local.env"
+    if [ ! -f "$local_env" ]; then
+        local mitmdump_bin
+        mitmdump_bin="$(detect_mitmdump)"
+        local detected_mode="explicit"
+        if [ -n "$mitmdump_bin" ] && { "$mitmdump_bin" --help 2>&1 || true; } | grep -q "local"; then
+            detected_mode="local"
+        fi
+        mkdir -p "$PROJECT_DIR/config"
+        cat > "$local_env" <<LOCAL_EOF
+PROXY_MODE=${detected_mode}
+FILTER_LEVEL=${MODE}
+LOCAL_EOF
+        echo "Created config/local.env (PROXY_MODE=${detected_mode}, FILTER_LEVEL=${MODE})"
     fi
 
-    # Create a launcher script that uses `uv run` so the project package
-    # is available to mitmproxy addons (they import cursor_telemetry_blocker).
+    bash "$SCRIPT_DIR/generate-launcher.sh"
+
     local launcher="${PROJECT_DIR}/scripts/.service-launcher.sh"
     mkdir -p "$HOME/Library/LaunchAgents"
 
-    local shim_script="${PROJECT_DIR}/scripts/deep_filter_shim.py"
-
-    if [ "$has_local_mode" = true ]; then
-        cat > "$launcher" <<LAUNCHER_EOF
-#!/usr/bin/env bash
-cd "${PROJECT_DIR}"
-exec "${mitmdump_bin}" \\
-    --mode local:Cursor \\
-    --set confdir="${CONFDIR}" \\
-    --scripts "${shim_script}" \\
-    --quiet
-LAUNCHER_EOF
-        chmod +x "$launcher"
-
-        cat > "$PLIST_PATH" <<PLIST_EOF
+    cat > "$PLIST_PATH" <<PLIST_EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -176,57 +168,13 @@ LAUNCHER_EOF
 </dict>
 </plist>
 PLIST_EOF
-        echo "Installed LaunchAgent with transparent local mode (--mode local:Cursor)"
-        echo "Cursor traffic will be intercepted automatically when you open it."
-    else
-        cat > "$launcher" <<LAUNCHER_EOF
-#!/usr/bin/env bash
-cd "${PROJECT_DIR}"
-exec "${uv_bin}" run mitmdump \\
-    --listen-port 18080 \\
-    --set confdir="${CONFDIR}" \\
-    --set console_eventlog_verbosity=warn \\
-    --scripts "${ADDON_SCRIPT}" \\
-    --quiet
-LAUNCHER_EOF
-        chmod +x "$launcher"
-
-        cat > "$PLIST_PATH" <<PLIST_EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>Label</key>
-    <string>${LABEL}</string>
-    <key>ProgramArguments</key>
-    <array>
-        <string>/bin/bash</string>
-        <string>${launcher}</string>
-    </array>
-    <key>RunAtLoad</key>
-    <true/>
-    <key>KeepAlive</key>
-    <true/>
-    <key>StandardOutPath</key>
-    <string>${PROJECT_DIR}/cursor_blocker_service.log</string>
-    <key>StandardErrorPath</key>
-    <string>${PROJECT_DIR}/cursor_blocker_service.log</string>
-</dict>
-</plist>
-PLIST_EOF
-        echo "Installed LaunchAgent with explicit proxy mode (port 18080)"
-        echo ""
-        echo "For transparent interception (no proxy config needed), install"
-        echo "mitmproxy via Homebrew: brew install mitmproxy"
-        echo "Then re-run: make service-install"
-    fi
 
     launchctl load "$PLIST_PATH" 2>/dev/null || true
     echo ""
     echo "Service installed and started."
-    echo "  Status:    launchctl list | grep cursor-telemetry"
-    echo "  Logs:      tail -f $PROJECT_DIR/cursor_blocker_service.log"
-    echo "  Uninstall: make service-uninstall"
+    echo "  Status:  make service-status"
+    echo "  Doctor:  make doctor"
+    echo "  Logs:    tail -f $PROJECT_DIR/cursor_blocker_service.log"
 }
 
 uninstall_launchagent() {
@@ -263,12 +211,58 @@ show_status() {
     fi
 }
 
+repair_service() {
+    echo "Repairing service from config/local.env..."
+
+    bash "$SCRIPT_DIR/generate-launcher.sh"
+
+    if [ -f "$PLIST_PATH" ]; then
+        launchctl unload "$PLIST_PATH" 2>/dev/null || true
+        sleep 1
+        launchctl load "$PLIST_PATH" 2>/dev/null || true
+        echo "Service restarted with updated launcher."
+    else
+        echo "No plist found. Run: make service-install"
+        exit 1
+    fi
+
+    echo ""
+    echo "Running doctor..."
+    bash "$SCRIPT_DIR/cursor-doctor.sh" || true
+}
+
+upgrade_service() {
+    echo "Upgrading cursor-telemetry-blocker..."
+
+    cd "$PROJECT_DIR"
+
+    local current_branch
+    current_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "main")
+
+    echo "Pulling latest from origin/${current_branch}..."
+    git pull --quiet origin "$current_branch" 2>/dev/null || {
+        echo "Warning: git pull failed. Continuing with current code."
+    }
+
+    local uv_bin
+    uv_bin="$(detect_uv)"
+    if [ -n "$uv_bin" ]; then
+        echo "Syncing dependencies..."
+        (cd "$PROJECT_DIR" && "$uv_bin" sync --quiet 2>/dev/null || true)
+    fi
+
+    echo "Regenerating launcher from config/local.env..."
+    repair_service
+}
+
 case "${1:-status}" in
     install)   install_launchagent ;;
     uninstall) uninstall_launchagent ;;
     status)    show_status ;;
+    repair)    repair_service ;;
+    upgrade)   upgrade_service ;;
     *)
-        echo "Usage: $0 {install|uninstall|status} [block|deep|observe]"
+        echo "Usage: $0 {install|uninstall|status|repair|upgrade} [block|deep|observe]"
         exit 1
         ;;
 esac

@@ -1,5 +1,6 @@
 .PHONY: install run run-deep observe dashboard hosts ca-cert lint clean help
 .PHONY: service-install service-uninstall service-status
+.PHONY: doctor doctor-fix repair upgrade
 
 help:
 	@echo "cursor-telemetry-blocker"
@@ -16,10 +17,16 @@ help:
 	@echo "  make lint               Run ruff linter"
 	@echo "  make clean              Remove logs and pid files"
 	@echo ""
-	@echo "Auto-start (macOS LaunchAgent):"
-	@echo "  make service-install    Install auto-start service (intercepts Cursor automatically)"
+	@echo "Service (macOS LaunchAgent):"
+	@echo "  make service-install    Install auto-start service"
 	@echo "  make service-uninstall  Remove auto-start service"
 	@echo "  make service-status     Show service status"
+	@echo ""
+	@echo "Maintenance:"
+	@echo "  make doctor             Health check (validates everything)"
+	@echo "  make doctor-fix         Health check + auto-repair"
+	@echo "  make repair             Regenerate launcher from config and restart"
+	@echo "  make upgrade            Pull latest code + repair + doctor"
 
 install:
 	uv sync
@@ -56,6 +63,18 @@ service-uninstall:
 
 service-status:
 	bash scripts/cursor-blocker-service.sh status
+
+doctor:
+	bash scripts/cursor-doctor.sh
+
+doctor-fix:
+	bash scripts/cursor-doctor.sh fix
+
+repair:
+	bash scripts/cursor-blocker-service.sh repair
+
+upgrade:
+	bash scripts/cursor-blocker-service.sh upgrade
 
 lint:
 	uv run ruff check src/

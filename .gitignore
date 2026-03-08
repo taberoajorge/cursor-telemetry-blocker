@@ -13,3 +13,4 @@ wheels/
 .python-version
 .cursor/
 scripts/.service-launcher.sh
+config/local.env
