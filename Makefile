@@ -10,6 +10,7 @@ help:
 	@echo "  make run-deep           Run in deep mode (manual launch)"
 	@echo "  make observe            Run in observe mode (log only)"
 	@echo "  make dashboard          Open interactive TUI dashboard"
+	@echo "  make dashboard-demo     Dashboard with simulated events (preview)"
 	@echo "  make ca-cert            Install mitmproxy CA cert"
 	@echo "  make hosts              Block telemetry domains via /etc/hosts"
 	@echo "  make lint               Run ruff linter"
@@ -34,6 +35,9 @@ observe:
 
 dashboard:
 	uv run python -m cursor_telemetry_blocker
+
+dashboard-demo:
+	uv run python -m cursor_telemetry_blocker --demo
 
 ca-cert:
 	bash scripts/setup-ca-cert.sh
