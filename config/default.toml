@@ -1,0 +1,74 @@
+[domains]
+telemetry = [
+    "metrics.cursor.sh",
+    "mobile.events.data.microsoft.com",
+    "default.exp-tas.com",
+    "cursor-user-debugging-data.s3.us-east-1.amazonaws.com",
+    "statsig.cursor.sh",
+]
+
+indexing = [
+    "repo42.cursor.sh",
+    "api.turbopuffer.com",
+]
+
+patterns = [
+    ".turbopuffer.com",
+    ".ingest.sentry.io",
+]
+
+[grpc]
+analytics = [
+    "ClientLoggerService",
+    "AnalyticsService/Batch",
+    "AnalyticsService/BootstrapStatsig",
+    "AnalyticsService/Track",
+    "AiService/ReportClientNumericMetrics",
+    "AiService/ReportCommitAiAnalytics",
+    "AiService/UpdateVscodeProfile",
+    "AiService/ReportUsageEvent",
+    "AiService/RecordTelemetry",
+    "InAppAdService",
+    "IndexerService",
+    "/tev1/",
+    "/rgstr",
+]
+
+repo_tracking = [
+    "/repository/",
+    "/repository.v1.",
+    "RepositoryService",
+    "DashboardService/GetTeamRepos",
+    "DashboardService",
+]
+
+strip_repo = [
+    "ChatService",
+    "AiService",
+    "StreamChat",
+    "GetChat",
+    "GetPromptDryRun",
+]
+
+[passthrough]
+ai = [
+    "ChatService",
+    "AiService/GetDefaultModelNudgeData",
+    "AiService/AvailableDocs",
+    "AiService/ServerTime",
+    "AiService/StreamChat",
+    "AiService/GetChat",
+]
+
+auth = [
+    "/auth/",
+    "stripe",
+    "authenticate.cursor.sh",
+    "authenticator.cursor.sh",
+]
+
+[options]
+block_sentry = true
+block_indexing = true
+strip_workspace_paths = true
+proxy_port = 18080
