@@ -158,6 +158,46 @@ setup_alias() {
     fi
 }
 
+install_homebrew() {
+    if command_exists brew; then
+        success "Homebrew already installed"
+        return 0
+    fi
+
+    info "Installing Homebrew..."
+    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+    if [ -x "/opt/homebrew/bin/brew" ]; then
+        eval "$(/opt/homebrew/bin/brew shellenv)"
+    elif [ -x "/usr/local/bin/brew" ]; then
+        eval "$(/usr/local/bin/brew shellenv)"
+    fi
+
+    if command_exists brew; then
+        success "Homebrew installed"
+    else
+        error "Failed to install Homebrew"
+        return 1
+    fi
+}
+
+install_mitmproxy_brew() {
+    if [ -x "/opt/homebrew/bin/mitmdump" ] || [ -x "/usr/local/bin/mitmdump" ]; then
+        success "mitmproxy already installed via Homebrew"
+        return 0
+    fi
+
+    info "Installing mitmproxy via Homebrew..."
+    brew install mitmproxy
+
+    if [ -x "/opt/homebrew/bin/mitmdump" ] || [ -x "/usr/local/bin/mitmdump" ]; then
+        success "mitmproxy installed (transparent interception enabled)"
+    else
+        error "Failed to install mitmproxy via Homebrew"
+        return 1
+    fi
+}
+
 setup_autostart() {
     local os_name
     os_name="$(detect_os)"
@@ -173,31 +213,33 @@ setup_autostart() {
     echo "  whenever you log in. Cursor traffic is intercepted transparently"
     echo "  without needing to launch Cursor from the terminal."
     echo ""
-
-    local has_brew_mitmproxy=false
-    if [ -x "/opt/homebrew/bin/mitmdump" ] || [ -x "/usr/local/bin/mitmdump" ]; then
-        has_brew_mitmproxy=true
-    fi
-
-    if [ "$has_brew_mitmproxy" = true ]; then
-        echo "  Homebrew mitmproxy detected: transparent interception available."
-        echo "  This uses --mode local:Cursor (macOS Network Extension)."
-        echo "  No proxy env vars needed. Just open Cursor normally."
-    else
-        echo "  Note: Homebrew mitmproxy not found. The service will use"
-        echo "  explicit proxy mode (port 18080). For transparent interception,"
-        echo "  install mitmproxy via Homebrew: brew install mitmproxy"
-    fi
+    echo "  This requires mitmproxy installed via Homebrew for transparent"
+    echo "  interception (--mode local:Cursor via macOS Network Extension)."
     echo ""
 
     read -p "Install auto-start service? [Y/n] " SERVICE_REPLY
     if [[ ! "${SERVICE_REPLY:-Y}" =~ ^[Nn]$ ]]; then
+
+        step "Installing Homebrew"
+        if ! install_homebrew; then
+            warn "Cannot proceed without Homebrew. Run 'make service-install' later."
+            return 0
+        fi
+
+        step "Installing mitmproxy (Homebrew)"
+        if ! install_mitmproxy_brew; then
+            warn "Cannot proceed without mitmproxy. Run 'make service-install' later."
+            return 0
+        fi
+
+        echo ""
+        echo "  Select blocking mode for the auto-start service:"
         echo ""
         echo "  1) block   Block telemetry, pass AI requests (recommended)"
         echo "  2) deep    Block + strip repo names from AI requests"
         echo "  3) observe Log only, no blocking"
         echo ""
-        read -p "Select mode for auto-start [1]: " MODE_CHOICE
+        read -p "Select mode [1]: " MODE_CHOICE
         local service_mode="block"
         case "${MODE_CHOICE:-1}" in
             2) service_mode="deep" ;;
@@ -287,7 +329,7 @@ main() {
         [ "$skip_cert" = false ] && info "[DRY RUN] Would install CA cert"
         [ "$skip_hosts" = false ] && info "[DRY RUN] Would update /etc/hosts"
         [ "$skip_alias" = false ] && info "[DRY RUN] Would create shell alias"
-        [ "$skip_service" = false ] && info "[DRY RUN] Would install auto-start service"
+        [ "$skip_service" = false ] && info "[DRY RUN] Would install Homebrew, mitmproxy, and auto-start service"
         exit 0
     fi
 

@@ -39,23 +39,54 @@ detect_mitmdump() {
     echo ""
 }
 
+install_mitmproxy_if_missing() {
+    local existing
+    existing="$(detect_mitmdump)"
+    if [ -n "$existing" ]; then
+        return 0
+    fi
+
+    echo "mitmproxy not found. Installing via Homebrew..."
+
+    if ! command -v brew > /dev/null 2>&1; then
+        echo "Homebrew not found. Installing Homebrew first..."
+        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+        if [ -x "/opt/homebrew/bin/brew" ]; then
+            eval "$(/opt/homebrew/bin/brew shellenv)"
+        elif [ -x "/usr/local/bin/brew" ]; then
+            eval "$(/usr/local/bin/brew shellenv)"
+        fi
+    fi
+
+    if ! command -v brew > /dev/null 2>&1; then
+        echo "Error: Homebrew installation failed."
+        exit 1
+    fi
+
+    brew install mitmproxy
+
+    existing="$(detect_mitmdump)"
+    if [ -z "$existing" ]; then
+        echo "Error: mitmproxy installation failed."
+        exit 1
+    fi
+
+    echo "mitmproxy installed successfully."
+}
+
 install_launchagent() {
     if [ "$OS_TYPE" != "Darwin" ]; then
         echo "LaunchAgent is macOS only. On Linux, use systemd instead."
         exit 1
     fi
 
+    install_mitmproxy_if_missing
+
     local mitmdump_bin
     mitmdump_bin="$(detect_mitmdump)"
 
     if [ -z "$mitmdump_bin" ]; then
-        echo "Error: mitmdump not found."
-        echo ""
-        echo "For automatic mode (--mode local:Cursor), install via Homebrew:"
-        echo "  brew install mitmproxy"
-        echo ""
-        echo "The Homebrew version includes the macOS Network Extension"
-        echo "required for transparent app-level interception."
+        echo "Error: mitmdump not found after installation attempt."
         exit 1
     fi
 
