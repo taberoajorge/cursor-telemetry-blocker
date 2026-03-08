@@ -35,6 +35,7 @@ show_help() {
     echo "  --no-hosts      Skip /etc/hosts configuration"
     echo "  --no-cert       Skip CA certificate installation"
     echo "  --no-alias      Skip shell alias creation"
+    echo "  --no-service    Skip auto-start service setup"
     echo "  --dry-run       Preview what will be installed"
     echo "  --version       Show version"
     echo "  --help          Show this help"
@@ -157,22 +158,88 @@ setup_alias() {
     fi
 }
 
+setup_autostart() {
+    local os_name
+    os_name="$(detect_os)"
+
+    if [ "$os_name" != "macos" ]; then
+        info "Auto-start service is currently macOS only (LaunchAgent)."
+        info "On Linux, you can create a systemd user service manually."
+        return 0
+    fi
+
+    echo ""
+    echo "  Auto-start makes the telemetry blocker run automatically"
+    echo "  whenever you log in. Cursor traffic is intercepted transparently"
+    echo "  without needing to launch Cursor from the terminal."
+    echo ""
+
+    local has_brew_mitmproxy=false
+    if [ -x "/opt/homebrew/bin/mitmdump" ] || [ -x "/usr/local/bin/mitmdump" ]; then
+        has_brew_mitmproxy=true
+    fi
+
+    if [ "$has_brew_mitmproxy" = true ]; then
+        echo "  Homebrew mitmproxy detected: transparent interception available."
+        echo "  This uses --mode local:Cursor (macOS Network Extension)."
+        echo "  No proxy env vars needed. Just open Cursor normally."
+    else
+        echo "  Note: Homebrew mitmproxy not found. The service will use"
+        echo "  explicit proxy mode (port 18080). For transparent interception,"
+        echo "  install mitmproxy via Homebrew: brew install mitmproxy"
+    fi
+    echo ""
+
+    read -p "Install auto-start service? [Y/n] " SERVICE_REPLY
+    if [[ ! "${SERVICE_REPLY:-Y}" =~ ^[Nn]$ ]]; then
+        echo ""
+        echo "  1) block   Block telemetry, pass AI requests (recommended)"
+        echo "  2) deep    Block + strip repo names from AI requests"
+        echo "  3) observe Log only, no blocking"
+        echo ""
+        read -p "Select mode for auto-start [1]: " MODE_CHOICE
+        local service_mode="block"
+        case "${MODE_CHOICE:-1}" in
+            2) service_mode="deep" ;;
+            3) service_mode="observe" ;;
+            *) service_mode="block" ;;
+        esac
+
+        bash "$INSTALL_DIR/scripts/cursor-blocker-service.sh" install "$service_mode"
+        success "Auto-start service installed (mode: $service_mode)"
+    else
+        info "Skipped auto-start. Run 'make service-install' later."
+    fi
+}
+
 show_summary() {
     local os_name
     os_name="$(detect_os)"
+    local plist_path="$HOME/Library/LaunchAgents/com.cursor-telemetry-blocker.plist"
 
     echo ""
     printf "${GREEN}${BOLD}Installation complete!${NC}\n"
     echo ""
-    echo "Quick start:"
+
+    if [ "$os_name" = "macos" ] && [ -f "$plist_path" ]; then
+        echo "Auto-start is enabled. Just open Cursor normally."
+        echo "The telemetry blocker runs in the background automatically."
+        echo ""
+        echo "Service management:"
+        echo "  make service-status     Check if the service is running"
+        echo "  make service-uninstall  Disable auto-start"
+        echo ""
+    fi
+
+    echo "Manual launch:"
     echo "  cd $INSTALL_DIR"
-    echo "  make run            # Block mode (recommended)"
-    echo "  make run-deep       # Block + strip repo info from AI requests"
-    echo "  make observe        # Log only, no blocking"
+    echo "  make run            Block mode (recommended)"
+    echo "  make run-deep       Block + strip repo info from AI requests"
+    echo "  make observe        Log only, no blocking"
     echo ""
     echo "Or use the alias:"
-    echo "  cursor-private          # Block mode"
-    echo "  cursor-private deep     # Deep mode"
+    echo "  cursor-private          Block mode"
+    echo "  cursor-private deep     Deep mode"
     echo ""
     echo "Docs: https://github.com/taberoajorge/cursor-telemetry-blocker"
 }
@@ -181,6 +248,7 @@ main() {
     local skip_hosts=false
     local skip_cert=false
     local skip_alias=false
+    local skip_service=false
     local dry_run=false
 
     while [[ $# -gt 0 ]]; do
@@ -188,10 +256,11 @@ main() {
             --no-hosts)   skip_hosts=true; shift ;;
             --no-cert)    skip_cert=true; shift ;;
             --no-alias)   skip_alias=true; shift ;;
+            --no-service) skip_service=true; shift ;;
             --dry-run)    dry_run=true; shift ;;
             --version)    echo "cursor-telemetry-blocker installer v${INSTALLER_VERSION}"; exit 0 ;;
             --help)       show_help; exit 0 ;;
-            --mode)       shift; shift ;; # consumed but mode stored in config
+            --mode)       shift; shift ;;
             *)            error "Unknown option: $1"; show_help; exit 1 ;;
         esac
     done
@@ -218,6 +287,7 @@ main() {
         [ "$skip_cert" = false ] && info "[DRY RUN] Would install CA cert"
         [ "$skip_hosts" = false ] && info "[DRY RUN] Would update /etc/hosts"
         [ "$skip_alias" = false ] && info "[DRY RUN] Would create shell alias"
+        [ "$skip_service" = false ] && info "[DRY RUN] Would install auto-start service"
         exit 0
     fi
 
@@ -243,6 +313,11 @@ main() {
     if [ "$skip_alias" = false ]; then
         step "Shell alias"
         setup_alias
+    fi
+
+    if [ "$skip_service" = false ]; then
+        step "Auto-start service"
+        setup_autostart
     fi
 
     show_summary

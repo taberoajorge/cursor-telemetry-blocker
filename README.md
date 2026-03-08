@@ -20,6 +20,7 @@ Cursor IDE sends telemetry data including metrics, analytics, repository names, 
 ## Table of Contents
 
 - [Quick Start](#quick-start)
+- [Auto-Start](#auto-start)
 - [Modes](#modes)
 - [What Gets Blocked](#what-gets-blocked)
 - [How It Works](#how-it-works)
@@ -53,6 +54,22 @@ brew tap taberoajorge/cursor-telemetry-blocker
 brew install cursor-telemetry-blocker
 cursor-private
 ```
+
+## Auto-Start
+
+On macOS, the telemetry blocker can run as a background service that starts automatically on login. Just open Cursor normally and traffic is intercepted transparently.
+
+```bash
+make service-install       # install and start the service
+make service-status        # check if it's running
+make service-uninstall     # remove the service
+```
+
+The installer wizard (`install.sh`) includes this as an interactive step.
+
+**Transparent mode** (recommended): If mitmproxy is installed via Homebrew (`brew install mitmproxy`), the service uses `--mode local:Cursor` which intercepts Cursor traffic at the OS level via macOS Network Extension. No proxy env vars or special launch needed.
+
+**Fallback mode**: Without Homebrew mitmproxy, the service runs as an explicit proxy on port 18080. You still need to launch Cursor with proxy env vars or set `"http.proxy"` in Cursor settings.
 
 ## Modes
 
@@ -107,7 +124,17 @@ In deep mode, the following fields are redacted from gRPC protobuf payloads befo
 
 ```mermaid
 flowchart TD
-    CursorIDE["Cursor IDE"] -->|"HTTP_PROXY / HTTPS_PROXY"| Proxy["mitmproxy :18080"]
+    subgraph Interception
+        direction TB
+        Auto["Auto-start (LaunchAgent)"]
+        TransparentMode["--mode local:Cursor<br/>(macOS Network Extension)"]
+        ManualMode["HTTP_PROXY / HTTPS_PROXY<br/>(manual launch)"]
+        Auto --> TransparentMode
+    end
+    CursorIDE["Cursor IDE"] --> TransparentMode
+    CursorIDE --> ManualMode
+    TransparentMode --> Proxy["mitmproxy"]
+    ManualMode --> Proxy
     Proxy --> Check{"Telemetry?"}
     Check -->|Yes| Block["Block (fake 200)"]
     Check -->|No| AICheck{"AI request?"}
@@ -117,11 +144,19 @@ flowchart TD
     Pass --> Server["Cursor servers"]
 ```
 
-1. Cursor launches with `HTTP_PROXY` and `HTTPS_PROXY` pointing to the local mitmproxy on port 18080
+**Transparent mode** (auto-start with Homebrew mitmproxy):
+1. A macOS LaunchAgent starts mitmproxy with `--mode local:Cursor` on login
+2. The macOS Network Extension intercepts Cursor's traffic at the OS level
+3. No proxy env vars needed. Just open Cursor normally.
+
+**Manual mode** (explicit proxy):
+1. Cursor launches with `HTTP_PROXY`/`HTTPS_PROXY` pointing to local mitmproxy on port 18080
 2. mitmproxy's Python addon inspects each request
-3. Telemetry requests get a fake 200 response (blocked)
-4. AI requests pass through (optionally stripped of repo info in deep mode)
-5. Auth, marketplace, and other requests pass through unchanged
+
+**Both modes share the same filtering pipeline:**
+1. Telemetry requests get a fake 200 response (blocked)
+2. AI requests pass through (optionally stripped of repo info in deep mode)
+3. Auth, marketplace, and other requests pass through unchanged
 
 ## Configuration
 
@@ -155,19 +190,20 @@ make hosts
 
 ```
 src/cursor_telemetry_blocker/
-  config.py        Shared block lists, logger factory, classification
-  filter.py        Block mode mitmproxy addon
-  deep_filter.py   Deep mode addon (protobuf stripping)
-  observer.py      Observe mode addon
-  protobuf.py      Varint/gRPC frame encode/decode
+  config.py                Shared block lists, logger factory, classification
+  filter.py                Block mode mitmproxy addon
+  deep_filter.py           Deep mode addon (protobuf stripping)
+  observer.py              Observe mode addon
+  protobuf.py              Varint/gRPC frame encode/decode
 scripts/
-  cursor-private.sh    Main launcher (macOS + Linux)
-  setup-ca-cert.sh     CA certificate installer
-  setup-hosts.sh       Hosts file blocker
+  cursor-private.sh        Main launcher (macOS + Linux)
+  cursor-blocker-service.sh  LaunchAgent installer/manager
+  setup-ca-cert.sh         CA certificate installer
+  setup-hosts.sh           Hosts file blocker
 config/
-  default.toml         Default block list configuration
+  default.toml             Default block list configuration
 proto/
-  aiserver_v1.proto    Cursor AI gRPC schema reference
+  aiserver_v1.proto        Cursor AI gRPC schema reference
 ```
 
 ## Contributing
