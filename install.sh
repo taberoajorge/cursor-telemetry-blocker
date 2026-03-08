@@ -181,12 +181,29 @@ install_homebrew() {
     fi
 }
 
+fix_brew_permissions() {
+    local unwritable
+    unwritable="$(brew doctor 2>&1 | grep -A1 'not writable' | grep '^ ' | xargs 2>/dev/null || true)"
+    if [ -z "$unwritable" ]; then
+        return 0
+    fi
+    warn "Fixing Homebrew directory permissions..."
+    for dir in $unwritable; do
+        if [ -d "$dir" ]; then
+            sudo chown -R "$(whoami)" "$dir"
+            chmod u+w "$dir"
+        fi
+    done
+    success "Homebrew directory permissions fixed"
+}
+
 install_mitmproxy_brew() {
     if [ -x "/opt/homebrew/bin/mitmdump" ] || [ -x "/usr/local/bin/mitmdump" ]; then
         success "mitmproxy already installed via Homebrew"
         return 0
     fi
 
+    fix_brew_permissions
     info "Installing mitmproxy via Homebrew..."
     brew install mitmproxy
 
