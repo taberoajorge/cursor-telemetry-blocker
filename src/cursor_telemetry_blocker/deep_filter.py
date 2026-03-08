@@ -1,11 +1,12 @@
 from mitmproxy import http
 
 from cursor_telemetry_blocker.config import (
-    BLOCKED_DOMAINS,
-    BLOCKED_GRPC_PATHS,
     LOG_FILES,
-    REPO_TRACKING_MARKERS,
     create_logger,
+    is_blocked_domain,
+    is_blocked_grpc_path,
+    is_repo_tracking,
+    is_sentry_envelope,
     should_strip_repo,
 )
 from cursor_telemetry_blocker.protobuf import (
@@ -29,19 +30,19 @@ class CursorDeepTelemetryFilter:
         content_type = flow.request.headers.get("content-type", "")
         is_grpc = "grpc" in content_type
 
-        if host in BLOCKED_DOMAINS:
+        if is_blocked_domain(host):
             self._block_request(flow, f"blocked domain: {host}")
             return
 
-        if any(marker in path for marker in BLOCKED_GRPC_PATHS):
+        if is_blocked_grpc_path(path):
             self._block_request(flow, f"blocked gRPC path: {path}")
             return
 
-        if any(marker in path for marker in REPO_TRACKING_MARKERS):
+        if is_repo_tracking(path):
             self._block_request(flow, f"blocked repo tracking: {path}")
             return
 
-        if "envelope" in path and "cursor" in host:
+        if is_sentry_envelope(host, path):
             self._block_request(flow, f"blocked sentry: {host}{path}")
             return
 

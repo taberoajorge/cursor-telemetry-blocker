@@ -18,6 +18,9 @@ sudo tee -a "$HOSTS_FILE" > /dev/null <<'HOSTS_BLOCK'
 127.0.0.1 mobile.events.data.microsoft.com
 127.0.0.1 default.exp-tas.com
 127.0.0.1 cursor-user-debugging-data.s3.us-east-1.amazonaws.com
+127.0.0.1 repo42.cursor.sh
+127.0.0.1 api.turbopuffer.com
+127.0.0.1 statsig.cursor.sh
 HOSTS_BLOCK
 
 echo "Flushing DNS cache..."

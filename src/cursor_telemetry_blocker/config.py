@@ -6,16 +6,28 @@ BLOCKED_DOMAINS = {
     "mobile.events.data.microsoft.com",
     "default.exp-tas.com",
     "cursor-user-debugging-data.s3.us-east-1.amazonaws.com",
+    "repo42.cursor.sh",
+    "api.turbopuffer.com",
+    "statsig.cursor.sh",
 }
+
+BLOCKED_DOMAIN_PATTERNS = [
+    ".turbopuffer.com",
+    ".ingest.sentry.io",
+]
 
 BLOCKED_GRPC_PATHS = [
     "ClientLoggerService",
     "AnalyticsService/Batch",
     "AnalyticsService/BootstrapStatsig",
+    "AnalyticsService/Track",
     "AiService/ReportClientNumericMetrics",
     "AiService/ReportCommitAiAnalytics",
     "AiService/UpdateVscodeProfile",
+    "AiService/ReportUsageEvent",
+    "AiService/RecordTelemetry",
     "InAppAdService",
+    "IndexerService",
     "/tev1/",
     "/rgstr",
 ]
@@ -25,6 +37,7 @@ REPO_TRACKING_MARKERS = [
     "/repository.v1.",
     "RepositoryService",
     "DashboardService/GetTeamRepos",
+    "DashboardService",
 ]
 
 AI_PASSTHROUGH_MARKERS = [
@@ -87,7 +100,9 @@ def create_logger(name: str, log_file: str) -> logging.Logger:
 
 
 def is_blocked_domain(host: str) -> bool:
-    return host in BLOCKED_DOMAINS
+    if host in BLOCKED_DOMAINS:
+        return True
+    return any(host.endswith(pattern) for pattern in BLOCKED_DOMAIN_PATTERNS)
 
 
 def is_blocked_grpc_path(path: str) -> bool:
@@ -99,6 +114,8 @@ def is_repo_tracking(path: str) -> bool:
 
 
 def is_sentry_envelope(host: str, path: str) -> bool:
+    if "ingest.sentry.io" in host:
+        return True
     return "envelope" in path and "cursor" in host
 
 
