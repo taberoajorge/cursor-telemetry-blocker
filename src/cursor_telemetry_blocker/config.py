@@ -138,7 +138,7 @@ def is_repo_tracking(path: str) -> bool:
 
 
 def is_sentry_envelope(host: str, path: str) -> bool:
-    if "ingest.sentry.io" in host:
+    if "sentry.io" in host:
         return True
     return "envelope" in path and "cursor" in host
 

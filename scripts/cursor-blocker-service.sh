@@ -139,14 +139,16 @@ install_launchagent() {
     local launcher="${PROJECT_DIR}/scripts/.service-launcher.sh"
     mkdir -p "$HOME/Library/LaunchAgents"
 
+    local shim_script="${PROJECT_DIR}/scripts/deep_filter_shim.py"
+
     if [ "$has_local_mode" = true ]; then
         cat > "$launcher" <<LAUNCHER_EOF
 #!/usr/bin/env bash
 cd "${PROJECT_DIR}"
-exec "${uv_bin}" run mitmdump \\
+exec "${mitmdump_bin}" \\
     --mode local:Cursor \\
     --set confdir="${CONFDIR}" \\
-    --scripts "${ADDON_SCRIPT}" \\
+    --scripts "${shim_script}" \\
     --quiet
 LAUNCHER_EOF
         chmod +x "$launcher"
