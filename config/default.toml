@@ -22,6 +22,7 @@ indexing = [
 patterns = [
     ".turbopuffer.com",
     ".ingest.sentry.io",
+    ".ingest.us.sentry.io",
 ]
 
 [grpc]
@@ -30,6 +31,10 @@ analytics = [
     "AnalyticsService/Batch",
     "AnalyticsService/BootstrapStatsig",
     "AnalyticsService/Track",
+    "AnalyticsService/SubmitLogs",
+    "MetricsService/ReportGauge",
+    "MetricsService/ReportDistribution",
+    "MetricsService/ReportIncrement",
     "AiService/ReportClientNumericMetrics",
     "AiService/ReportCommitAiAnalytics",
     "AiService/ReportAiCodeChangeMetrics",
@@ -49,6 +54,12 @@ repo_tracking = [
     "RepositoryService",
     "DashboardService/GetTeamRepos",
     "DashboardService",
+]
+
+repo_tracking_allowlist = [
+    "DashboardService/GetTeamPrivacyModeForced",
+    "DashboardService/GetUsageLimitStatusAndActiveGrants",
+    "DashboardService/GetTeamAdminSettingsOrEmptyIfNotInTeam",
 ]
 
 strip_repo = [

@@ -21,6 +21,7 @@ BLOCKED_DOMAINS = {
 BLOCKED_DOMAIN_PATTERNS = [
     ".turbopuffer.com",
     ".ingest.sentry.io",
+    ".ingest.us.sentry.io",
 ]
 
 BLOCKED_GRPC_PATHS = [
@@ -28,6 +29,10 @@ BLOCKED_GRPC_PATHS = [
     "AnalyticsService/Batch",
     "AnalyticsService/BootstrapStatsig",
     "AnalyticsService/Track",
+    "AnalyticsService/SubmitLogs",
+    "MetricsService/ReportGauge",
+    "MetricsService/ReportDistribution",
+    "MetricsService/ReportIncrement",
     "AiService/ReportClientNumericMetrics",
     "AiService/ReportCommitAiAnalytics",
     "AiService/ReportAiCodeChangeMetrics",
@@ -47,6 +52,12 @@ REPO_TRACKING_MARKERS = [
     "RepositoryService",
     "DashboardService/GetTeamRepos",
     "DashboardService",
+]
+
+REPO_TRACKING_ALLOWLIST = [
+    "DashboardService/GetTeamPrivacyModeForced",
+    "DashboardService/GetUsageLimitStatusAndActiveGrants",
+    "DashboardService/GetTeamAdminSettingsOrEmptyIfNotInTeam",
 ]
 
 AI_PASSTHROUGH_MARKERS = [
@@ -121,6 +132,8 @@ def is_blocked_grpc_path(path: str) -> bool:
 
 
 def is_repo_tracking(path: str) -> bool:
+    if any(marker in path for marker in REPO_TRACKING_ALLOWLIST):
+        return False
     return any(marker in path for marker in REPO_TRACKING_MARKERS)
 
 
