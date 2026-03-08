@@ -9,6 +9,9 @@ WIRE_TYPE_32BIT = 5
 REPO_STRING_FIELDS = (2, 3, 4, 5, 11)
 REPO_TRACKED_FIELD = 6
 
+REQUEST_WORKSPACE_PATH_FIELD = 5
+REQUEST_REPO_FIELD = 3
+
 
 def decode_varint(data: bytes, offset: int) -> tuple[int, int]:
     result = 0
@@ -70,7 +73,11 @@ def strip_repo_info_from_protobuf(data: bytes) -> bytes:
 
             field_end = content_offset + length
 
-            if field_number == 3 and length > 10:
+            if field_number == REQUEST_WORKSPACE_PATH_FIELD and length < 500:
+                offset = field_end
+                continue
+
+            if field_number == REQUEST_REPO_FIELD and length > 10:
                 cleaned_submessage = redact_repository_info(data[content_offset:field_end])
                 output.write(encode_varint(tag))
                 output.write(encode_varint(len(cleaned_submessage)))
