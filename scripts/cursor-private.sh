@@ -2,25 +2,27 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+SRC_DIR="$PROJECT_DIR/src/cursor_telemetry_blocker"
 PROXY_PORT=18080
-CONFDIR="$SCRIPT_DIR/.mitmproxy"
+CONFDIR="$PROJECT_DIR/.mitmproxy"
 CA_CERT="$CONFDIR/mitmproxy-ca-cert.pem"
-MITM_PID_FILE="$SCRIPT_DIR/.mitm.pid"
+MITM_PID_FILE="$PROJECT_DIR/.mitm.pid"
 CURSOR_BIN="/Applications/Cursor.app/Contents/MacOS/Cursor"
 
 MODE="${1:-block}"
 
 case "$MODE" in
     observe)
-        ADDON_SCRIPT="$SCRIPT_DIR/cursor_observe.py"
+        ADDON_SCRIPT="$SRC_DIR/observer.py"
         echo "=== OBSERVE mode (logging only, no blocking) ==="
         ;;
     block)
-        ADDON_SCRIPT="$SCRIPT_DIR/cursor_telemetry_filter.py"
+        ADDON_SCRIPT="$SRC_DIR/filter.py"
         echo "=== BLOCK mode (telemetry blocked, AI passes through) ==="
         ;;
     deep)
-        ADDON_SCRIPT="$SCRIPT_DIR/cursor_telemetry_filter_deep.py"
+        ADDON_SCRIPT="$SRC_DIR/deep_filter.py"
         echo "=== DEEP mode (block + strip repo names from gRPC protobuf) ==="
         ;;
     *)
@@ -105,7 +107,7 @@ if [ -f "$MITM_PID_FILE" ]; then
 fi
 
 echo "Starting mitmproxy on port $PROXY_PORT..."
-cd "$SCRIPT_DIR"
+cd "$PROJECT_DIR"
 uv run mitmdump \
     --listen-port "$PROXY_PORT" \
     --set confdir="$CONFDIR" \

@@ -10,3 +10,4 @@ wheels/
 .mitm.pid
 *.log
 .python-version
+.cursor/
