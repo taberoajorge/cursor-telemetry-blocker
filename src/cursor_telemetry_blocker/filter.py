@@ -1,3 +1,5 @@
+from collections import Counter
+
 from mitmproxy import http
 
 from cursor_telemetry_blocker.config import (
@@ -16,6 +18,8 @@ class CursorTelemetryFilter:
         self.logger = create_logger("cursor_blocker", LOG_FILES["block"])
         self.blocked_count = 0
         self.passed_count = 0
+        self.blocked_categories: Counter = Counter()
+        self.passed_categories: Counter = Counter()
         self.logger.info("Cursor Telemetry Filter started")
 
     def request(self, flow: http.HTTPFlow) -> None:
@@ -24,27 +28,45 @@ class CursorTelemetryFilter:
         full_url = f"{host}{path}"
 
         if is_blocked_domain(host):
-            self._block_request(flow, f"blocked domain: {host}")
+            self._block_request(flow, f"blocked domain: {host}", "telemetry")
             return
 
         if is_blocked_grpc_path(path):
-            self._block_request(flow, f"blocked gRPC path: {path}")
+            self._block_request(flow, f"blocked gRPC path: {path}", "telemetry")
             return
 
         if is_repo_tracking(path):
-            self._block_request(flow, f"blocked repo tracking: {path}")
+            self._block_request(flow, f"blocked repo tracking: {path}", "repo")
             return
 
         if is_sentry_envelope(host, path):
-            self._block_request(flow, f"blocked sentry envelope: {full_url}")
+            self._block_request(flow, f"blocked sentry envelope: {full_url}", "sentry")
             return
 
         self.passed_count += 1
         classification = classify_passthrough(host, path)
+        self.passed_categories[classification] += 1
         self.logger.info(f"[PASS:{classification}] {flow.request.method} {full_url}")
 
-    def _block_request(self, flow: http.HTTPFlow, reason: str) -> None:
+    def done(self):
+        self.logger.info("=" * 60)
+        self.logger.info("SESSION SUMMARY")
+        self.logger.info("=" * 60)
+
+        blocked_detail = ", ".join(
+            f"{cat}: {count}" for cat, count in self.blocked_categories.most_common()
+        )
+        self.logger.info(f"  Blocked: {self.blocked_count} ({blocked_detail})")
+
+        passed_detail = ", ".join(
+            f"{cat}: {count}" for cat, count in self.passed_categories.most_common()
+        )
+        self.logger.info(f"  Passed:  {self.passed_count} ({passed_detail})")
+        self.logger.info("=" * 60)
+
+    def _block_request(self, flow: http.HTTPFlow, reason: str, category: str) -> None:
         self.blocked_count += 1
+        self.blocked_categories[category] += 1
 
         content_type = flow.request.headers.get("content-type", "")
         is_grpc = "grpc" in content_type

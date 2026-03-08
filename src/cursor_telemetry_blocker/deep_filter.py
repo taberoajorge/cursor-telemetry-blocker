@@ -1,3 +1,5 @@
+from collections import Counter
+
 from mitmproxy import http
 
 from cursor_telemetry_blocker.config import (
@@ -22,6 +24,8 @@ class CursorDeepTelemetryFilter:
         self.blocked_count = 0
         self.stripped_count = 0
         self.passed_count = 0
+        self.blocked_categories: Counter = Counter()
+        self.passed_categories: Counter = Counter()
         self.logger.info("Cursor Deep Telemetry Filter started (with protobuf stripping)")
 
     def request(self, flow: http.HTTPFlow) -> None:
@@ -31,19 +35,19 @@ class CursorDeepTelemetryFilter:
         is_grpc = "grpc" in content_type
 
         if is_blocked_domain(host):
-            self._block_request(flow, f"blocked domain: {host}")
+            self._block_request(flow, f"blocked domain: {host}", "telemetry")
             return
 
         if is_blocked_grpc_path(path):
-            self._block_request(flow, f"blocked gRPC path: {path}")
+            self._block_request(flow, f"blocked gRPC path: {path}", "telemetry")
             return
 
         if is_repo_tracking(path):
-            self._block_request(flow, f"blocked repo tracking: {path}")
+            self._block_request(flow, f"blocked repo tracking: {path}", "repo")
             return
 
         if is_sentry_envelope(host, path):
-            self._block_request(flow, f"blocked sentry: {host}{path}")
+            self._block_request(flow, f"blocked sentry: {host}{path}", "sentry")
             return
 
         if is_grpc and should_strip_repo(path) and flow.request.content:
@@ -51,7 +55,25 @@ class CursorDeepTelemetryFilter:
             return
 
         self.passed_count += 1
+        self.passed_categories["other"] += 1
         self.logger.info(f"[PASS] {flow.request.method} {host}{path}")
+
+    def done(self):
+        self.logger.info("=" * 60)
+        self.logger.info("SESSION SUMMARY")
+        self.logger.info("=" * 60)
+
+        blocked_detail = ", ".join(
+            f"{cat}: {count}" for cat, count in self.blocked_categories.most_common()
+        )
+        self.logger.info(f"  Blocked:  {self.blocked_count} ({blocked_detail})")
+        self.logger.info(f"  Stripped: {self.stripped_count} repo info payloads")
+
+        passed_detail = ", ".join(
+            f"{cat}: {count}" for cat, count in self.passed_categories.most_common()
+        )
+        self.logger.info(f"  Passed:   {self.passed_count} ({passed_detail})")
+        self.logger.info("=" * 60)
 
     def _strip_repo_from_grpc(self, flow: http.HTTPFlow) -> None:
         try:
@@ -87,6 +109,8 @@ class CursorDeepTelemetryFilter:
 
             self.passed_count += 1
             tag = "STRIP+PASS" if any_modified else "PASS"
+            category = "stripped" if any_modified else "ai"
+            self.passed_categories[category] += 1
             self.logger.info(
                 f"[{tag}] {flow.request.method} "
                 f"{flow.request.pretty_host}{flow.request.path}"
@@ -98,8 +122,9 @@ class CursorDeepTelemetryFilter:
             )
             self.passed_count += 1
 
-    def _block_request(self, flow: http.HTTPFlow, reason: str) -> None:
+    def _block_request(self, flow: http.HTTPFlow, reason: str, category: str) -> None:
         self.blocked_count += 1
+        self.blocked_categories[category] += 1
         content_type = flow.request.headers.get("content-type", "")
         is_grpc = "grpc" in content_type
 
