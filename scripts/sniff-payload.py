@@ -1,15 +1,25 @@
+"""Sniff-and-block addon for mitmproxy.
+
+Combines request blocking with detailed payload inspection. For each
+blocked or strip-eligible request, it decodes gRPC/protobuf frames and
+prints the extracted fields to stdout. Useful for discovering new
+telemetry endpoints and understanding what data Cursor sends.
+
+Usage:
+    make sniff          # via Makefile (if target added)
+    uv run mitmdump --scripts scripts/sniff-payload.py
+"""
+
 import sys
-import json
 import struct
 from pathlib import Path
-from io import BytesIO
 
 PROJECT_SRC = str(Path(__file__).resolve().parent.parent / "src")
 if PROJECT_SRC not in sys.path:
     sys.path.insert(0, PROJECT_SRC)
 
-from mitmproxy import http
-from cursor_telemetry_blocker.config import (
+from mitmproxy import http  # noqa: E402
+from cursor_telemetry_blocker.config import (  # noqa: E402
     is_blocked_domain,
     is_blocked_grpc_path,
     is_repo_tracking,
@@ -24,7 +34,7 @@ WIRE_TYPE_LENGTH_DELIMITED = 2
 WIRE_TYPE_32BIT = 5
 
 
-def decode_varint(data, offset):
+def decode_varint(data: bytes, offset: int) -> tuple[int, int]:
     result = 0
     shift = 0
     while offset < len(data):
@@ -37,15 +47,15 @@ def decode_varint(data, offset):
     return result, offset
 
 
-def extract_fields(data, max_depth=6):
-    fields_found = []
+def extract_fields(data: bytes, max_depth: int = 6) -> list[dict]:
+    fields_found: list[dict] = []
     offset = 0
     if max_depth <= 0:
         return fields_found
     while offset < len(data):
         try:
             tag, new_offset = decode_varint(data, offset)
-        except Exception:
+        except (IndexError, ValueError):
             break
         if tag == 0:
             break
@@ -63,7 +73,7 @@ def extract_fields(data, max_depth=6):
         elif wire_type == WIRE_TYPE_LENGTH_DELIMITED:
             try:
                 length, content_offset = decode_varint(data, new_offset)
-            except Exception:
+            except (IndexError, ValueError):
                 break
             if length > len(data) or length < 0:
                 break
@@ -114,8 +124,8 @@ def extract_fields(data, max_depth=6):
     return fields_found
 
 
-def decode_grpc_frames(body):
-    frames = []
+def decode_grpc_frames(body: bytes) -> list[tuple[bool, bytes]]:
+    frames: list[tuple[bool, bytes]] = []
     offset = 0
     while offset + 5 <= len(body):
         compressed = body[offset]
@@ -128,8 +138,8 @@ def decode_grpc_frames(body):
     return frames
 
 
-def flatten_strings(fields, prefix=""):
-    strings = []
+def flatten_strings(fields: list[dict], prefix: str = "") -> list[str]:
+    strings: list[str] = []
     for field in fields:
         path = f"{prefix}{field['f']}"
         if field["t"] == "str":

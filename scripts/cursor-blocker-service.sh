@@ -200,7 +200,8 @@ show_status() {
             echo "  Status: not running"
         fi
 
-        if grep -q "local:Cursor" "$PLIST_PATH" 2>/dev/null; then
+        local launcher="${PROJECT_DIR}/scripts/.service-launcher.sh"
+        if [ -f "$launcher" ] && grep -q "local:Cursor" "$launcher" 2>/dev/null; then
             echo "  Mode: transparent (--mode local:Cursor)"
         else
             echo "  Mode: explicit proxy (port 18080)"
@@ -234,22 +235,28 @@ repair_service() {
 upgrade_service() {
     echo "Upgrading cursor-telemetry-blocker..."
 
+    local uv_bin
+    uv_bin="$(detect_uv)"
+    if [ -z "$uv_bin" ]; then
+        echo "Error: uv not found. Install it first: curl -LsSf https://astral.sh/uv/install.sh | bash"
+        exit 1
+    fi
+
     cd "$PROJECT_DIR"
 
     local current_branch
     current_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "main")
 
     echo "Pulling latest from origin/${current_branch}..."
-    git pull --quiet origin "$current_branch" 2>/dev/null || {
-        echo "Warning: git pull failed. Continuing with current code."
-    }
-
-    local uv_bin
-    uv_bin="$(detect_uv)"
-    if [ -n "$uv_bin" ]; then
-        echo "Syncing dependencies..."
-        (cd "$PROJECT_DIR" && "$uv_bin" sync --quiet 2>/dev/null || true)
+    if ! git pull --quiet origin "$current_branch"; then
+        echo "Error: git pull failed. Fix conflicts or network issues and retry."
+        exit 1
     fi
+
+    echo "Syncing dependencies..."
+    (cd "$PROJECT_DIR" && "$uv_bin" sync --quiet) || {
+        echo "Warning: uv sync failed. Dependencies may be outdated."
+    }
 
     echo "Regenerating launcher from config/local.env..."
     repair_service

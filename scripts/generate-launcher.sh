@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# generate-launcher.sh — Build scripts/.service-launcher.sh from config/local.env.
+#
+# Reads PROXY_MODE and FILTER_LEVEL from config/local.env and generates the
+# launcher script used by the macOS LaunchAgent. Two modes are supported:
+#
+#   local    — transparent interception via Homebrew mitmdump (--mode local:Cursor)
+#   explicit — explicit HTTP proxy on port 18080 via uv run mitmdump
+#
+# Called by: cursor-blocker-service.sh install/repair/upgrade, cursor-doctor.sh fix.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -9,6 +18,7 @@ LAUNCHER="$PROJECT_DIR/scripts/.service-launcher.sh"
 SHIM="$PROJECT_DIR/scripts/deep_filter_shim.py"
 SRC_DIR="$PROJECT_DIR/src/cursor_telemetry_blocker"
 
+# Defaults (overridden by config/local.env if present)
 PROXY_MODE="local"
 FILTER_LEVEL="deep"
 
@@ -16,6 +26,16 @@ if [ -f "$LOCAL_ENV" ]; then
     # shellcheck disable=SC1090
     source "$LOCAL_ENV"
 fi
+
+# Validate config values
+case "$PROXY_MODE" in
+    local|explicit) ;;
+    *) echo "Error: invalid PROXY_MODE='$PROXY_MODE' in $LOCAL_ENV (expected: local, explicit)"; exit 1 ;;
+esac
+case "$FILTER_LEVEL" in
+    block|deep|observe) ;;
+    *) echo "Error: invalid FILTER_LEVEL='$FILTER_LEVEL' in $LOCAL_ENV (expected: block, deep, observe)"; exit 1 ;;
+esac
 
 detect_mitmdump() {
     for candidate in "/opt/homebrew/bin/mitmdump" "/usr/local/bin/mitmdump"; do

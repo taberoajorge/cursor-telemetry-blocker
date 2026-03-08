@@ -1,6 +1,6 @@
 .PHONY: install run run-deep observe dashboard hosts ca-cert lint clean help
-.PHONY: service-install service-uninstall service-status
-.PHONY: doctor doctor-fix repair upgrade
+.PHONY: service-install service-install-deep service-uninstall service-status
+.PHONY: doctor doctor-fix repair upgrade sniff
 
 help:
 	@echo "cursor-telemetry-blocker"
@@ -18,15 +18,19 @@ help:
 	@echo "  make clean              Remove logs and pid files"
 	@echo ""
 	@echo "Service (macOS LaunchAgent):"
-	@echo "  make service-install    Install auto-start service"
-	@echo "  make service-uninstall  Remove auto-start service"
-	@echo "  make service-status     Show service status"
+	@echo "  make service-install       Install auto-start service (block mode)"
+	@echo "  make service-install-deep  Install auto-start service (deep mode)"
+	@echo "  make service-uninstall     Remove auto-start service"
+	@echo "  make service-status        Show service status"
 	@echo ""
 	@echo "Maintenance:"
 	@echo "  make doctor             Health check (validates everything)"
 	@echo "  make doctor-fix         Health check + auto-repair"
 	@echo "  make repair             Regenerate launcher from config and restart"
 	@echo "  make upgrade            Pull latest code + repair + doctor"
+	@echo ""
+	@echo "Debug:"
+	@echo "  make sniff              Block + log decoded payloads of blocked requests"
 
 install:
 	uv sync
@@ -75,6 +79,9 @@ repair:
 
 upgrade:
 	bash scripts/cursor-blocker-service.sh upgrade
+
+sniff:
+	uv run mitmdump --listen-port 18080 --scripts scripts/sniff-payload.py
 
 lint:
 	uv run ruff check src/

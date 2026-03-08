@@ -37,6 +37,22 @@ load_local_env() {
         # shellcheck disable=SC1090
         source "$LOCAL_ENV"
     fi
+
+    # Validate loaded values
+    case "$PROXY_MODE" in
+        local|explicit) ;;
+        *)
+            printf "  ${RED}xx${NC}  Invalid PROXY_MODE='%s' in %s (expected: local, explicit)\n" "$PROXY_MODE" "$LOCAL_ENV"
+            PROXY_MODE="local"
+            ;;
+    esac
+    case "$FILTER_LEVEL" in
+        block|deep|observe) ;;
+        *)
+            printf "  ${RED}xx${NC}  Invalid FILTER_LEVEL='%s' in %s (expected: block, deep, observe)\n" "$FILTER_LEVEL" "$LOCAL_ENV"
+            FILTER_LEVEL="deep"
+            ;;
+    esac
 }
 
 detect_mitmdump() {
