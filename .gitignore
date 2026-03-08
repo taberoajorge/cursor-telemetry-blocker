@@ -12,3 +12,4 @@ wheels/
 *.jsonl
 .python-version
 .cursor/
+scripts/.service-launcher.sh

@@ -39,6 +39,25 @@ detect_mitmdump() {
     echo ""
 }
 
+detect_uv() {
+    for candidate in \
+        "$HOME/.local/bin/uv" \
+        "/opt/homebrew/bin/uv" \
+        "/usr/local/bin/uv"; do
+        if [ -x "$candidate" ]; then
+            echo "$candidate"
+            return
+        fi
+    done
+
+    if command -v uv > /dev/null 2>&1; then
+        command -v uv
+        return
+    fi
+
+    echo ""
+}
+
 install_mitmproxy_if_missing() {
     local existing
     existing="$(detect_mitmdump)"
@@ -63,6 +82,19 @@ install_mitmproxy_if_missing() {
         exit 1
     fi
 
+    # Fix Homebrew directory permissions (common issue on Intel Macs)
+    local unwritable
+    unwritable="$(brew doctor 2>&1 | grep -A1 'not writable' | grep '^ ' | xargs 2>/dev/null || true)"
+    if [ -n "$unwritable" ]; then
+        echo "Fixing Homebrew directory permissions..."
+        for dir in $unwritable; do
+            if [ -d "$dir" ]; then
+                sudo chown -R "$(whoami)" "$dir"
+                chmod u+w "$dir"
+            fi
+        done
+    fi
+
     brew install mitmproxy
 
     existing="$(detect_mitmdump)"
@@ -80,24 +112,45 @@ install_launchagent() {
         exit 1
     fi
 
+    local uv_bin
+    uv_bin="$(detect_uv)"
+
+    if [ -z "$uv_bin" ]; then
+        echo "Error: uv not found. Install it first: curl -LsSf https://astral.sh/uv/install.sh | bash"
+        exit 1
+    fi
+
+    # Ensure dependencies are installed
+    (cd "$PROJECT_DIR" && "$uv_bin" sync --quiet 2>/dev/null || true)
+
+    # Detect if Homebrew mitmproxy supports transparent mode
     install_mitmproxy_if_missing
 
     local mitmdump_bin
     mitmdump_bin="$(detect_mitmdump)"
 
-    if [ -z "$mitmdump_bin" ]; then
-        echo "Error: mitmdump not found after installation attempt."
-        exit 1
-    fi
-
     local has_local_mode=false
-    if "$mitmdump_bin" --help 2>&1 | grep -q "local"; then
+    if [ -n "$mitmdump_bin" ] && "$mitmdump_bin" --help 2>&1 | grep -q "local"; then
         has_local_mode=true
     fi
 
+    # Create a launcher script that uses `uv run` so the project package
+    # is available to mitmproxy addons (they import cursor_telemetry_blocker).
+    local launcher="${PROJECT_DIR}/scripts/.service-launcher.sh"
     mkdir -p "$HOME/Library/LaunchAgents"
 
     if [ "$has_local_mode" = true ]; then
+        cat > "$launcher" <<LAUNCHER_EOF
+#!/usr/bin/env bash
+cd "${PROJECT_DIR}"
+exec "${uv_bin}" run mitmdump \\
+    --mode local:Cursor \\
+    --set confdir="${CONFDIR}" \\
+    --scripts "${ADDON_SCRIPT}" \\
+    --quiet
+LAUNCHER_EOF
+        chmod +x "$launcher"
+
         cat > "$PLIST_PATH" <<PLIST_EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -107,14 +160,8 @@ install_launchagent() {
     <string>${LABEL}</string>
     <key>ProgramArguments</key>
     <array>
-        <string>${mitmdump_bin}</string>
-        <string>--mode</string>
-        <string>local:Cursor</string>
-        <string>--set</string>
-        <string>confdir=${CONFDIR}</string>
-        <string>--scripts</string>
-        <string>${ADDON_SCRIPT}</string>
-        <string>--quiet</string>
+        <string>/bin/bash</string>
+        <string>${launcher}</string>
     </array>
     <key>RunAtLoad</key>
     <true/>
@@ -130,6 +177,18 @@ PLIST_EOF
         echo "Installed LaunchAgent with transparent local mode (--mode local:Cursor)"
         echo "Cursor traffic will be intercepted automatically when you open it."
     else
+        cat > "$launcher" <<LAUNCHER_EOF
+#!/usr/bin/env bash
+cd "${PROJECT_DIR}"
+exec "${uv_bin}" run mitmdump \\
+    --listen-port 18080 \\
+    --set confdir="${CONFDIR}" \\
+    --set console_eventlog_verbosity=warn \\
+    --scripts "${ADDON_SCRIPT}" \\
+    --quiet
+LAUNCHER_EOF
+        chmod +x "$launcher"
+
         cat > "$PLIST_PATH" <<PLIST_EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -139,16 +198,8 @@ PLIST_EOF
     <string>${LABEL}</string>
     <key>ProgramArguments</key>
     <array>
-        <string>${mitmdump_bin}</string>
-        <string>--listen-port</string>
-        <string>18080</string>
-        <string>--set</string>
-        <string>confdir=${CONFDIR}</string>
-        <string>--set</string>
-        <string>console_eventlog_verbosity=warn</string>
-        <string>--scripts</string>
-        <string>${ADDON_SCRIPT}</string>
-        <string>--quiet</string>
+        <string>/bin/bash</string>
+        <string>${launcher}</string>
     </array>
     <key>RunAtLoad</key>
     <true/>
