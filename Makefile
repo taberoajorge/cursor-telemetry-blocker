@@ -1,4 +1,4 @@
-.PHONY: install run run-deep observe hosts ca-cert lint clean help
+.PHONY: install run run-deep observe dashboard hosts ca-cert lint clean help
 .PHONY: service-install service-uninstall service-status
 
 help:
@@ -9,6 +9,7 @@ help:
 	@echo "  make run                Run in block mode (manual launch)"
 	@echo "  make run-deep           Run in deep mode (manual launch)"
 	@echo "  make observe            Run in observe mode (log only)"
+	@echo "  make dashboard          Open interactive TUI dashboard"
 	@echo "  make ca-cert            Install mitmproxy CA cert"
 	@echo "  make hosts              Block telemetry domains via /etc/hosts"
 	@echo "  make lint               Run ruff linter"
@@ -30,6 +31,9 @@ run-deep:
 
 observe:
 	bash scripts/cursor-private.sh observe
+
+dashboard:
+	uv run python -m cursor_telemetry_blocker
 
 ca-cert:
 	bash scripts/setup-ca-cert.sh
@@ -53,4 +57,4 @@ lint:
 	uv run ruff check src/
 
 clean:
-	rm -f *.log .mitm.pid
+	rm -f *.log *.jsonl .mitm.pid

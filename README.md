@@ -20,6 +20,7 @@ Cursor IDE sends telemetry data including metrics, analytics, repository names, 
 ## Table of Contents
 
 - [Quick Start](#quick-start)
+- [Dashboard](#dashboard)
 - [Auto-Start](#auto-start)
 - [Modes](#modes)
 - [What Gets Blocked](#what-gets-blocked)
@@ -53,6 +54,47 @@ make run        # start in block mode
 brew tap taberoajorge/cursor-telemetry-blocker
 brew install cursor-telemetry-blocker
 cursor-private
+```
+
+## Dashboard
+
+Interactive terminal UI showing real-time proxy activity with live counters, categorized tabs, and keyboard shortcuts.
+
+```bash
+make dashboard
+```
+
+```
++-----------------------------------------------+
+|  Cursor Telemetry Blocker    LIVE  00:14:32    |
++-----------------------------------------------+
+|  Blocked 847   Passed 312   Stripped 45        |
++-----------------------------------------------+
+| [All] [Blocked] [Passed] [Stripped]            |
+|-----------------------------------------------|
+| 14:32:01  BLOCKED   metrics.cursor.sh/v1/t... |
+| 14:32:01  PASSED    api2.cursor.sh/ChatSer... |
+| 14:32:02  STRIPPED  api2.cursor.sh/AiServi... |
++-----------------------------------------------+
+| q Quit  p Pause  c Clear  t Theme             |
++-----------------------------------------------+
+```
+
+Keyboard shortcuts:
+
+| Key | Action |
+|-----|--------|
+| `q` | Quit |
+| `p` | Pause/resume event stream |
+| `c` | Clear current log view |
+| `t` | Toggle dark/light theme |
+| `1` `2` `3` `4` | Jump to All/Blocked/Passed/Stripped tab |
+| `Tab` | Cycle through tabs |
+
+Run the dashboard alongside the proxy (in a separate terminal), or launch both together:
+
+```bash
+DASHBOARD=1 make run
 ```
 
 ## Auto-Start
@@ -191,6 +233,9 @@ make hosts
 ```
 src/cursor_telemetry_blocker/
   config.py                Shared block lists, logger factory, classification
+  events.py                Structured event emitter/reader (JSON lines)
+  dashboard.py             Interactive TUI dashboard (Textual)
+  dashboard.tcss           Dashboard styling
   filter.py                Block mode mitmproxy addon
   deep_filter.py           Deep mode addon (protobuf stripping)
   observer.py              Observe mode addon

@@ -87,6 +87,8 @@ LOG_FILES = {
     "observe": "cursor_traffic.log",
 }
 
+EVENTS_FILE = "cursor_events.jsonl"
+
 
 def create_logger(name: str, log_file: str) -> logging.Logger:
     logger = logging.getLogger(name)

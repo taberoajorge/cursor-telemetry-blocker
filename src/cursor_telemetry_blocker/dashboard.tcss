@@ -1,0 +1,30 @@
+Screen {
+    background: $surface;
+}
+
+#stats_bar {
+    dock: top;
+    height: 3;
+    padding: 1 2;
+    background: $primary-background;
+    text-style: bold;
+    border-bottom: solid $primary;
+}
+
+TabbedContent {
+    height: 1fr;
+}
+
+TabPane {
+    padding: 0;
+}
+
+RichLog {
+    height: 1fr;
+    scrollbar-size: 1 1;
+    padding: 0 1;
+}
+
+Footer {
+    background: $primary-background;
+}

@@ -8,6 +8,7 @@ dependencies = [
     "grpcio-tools>=1.78.0",
     "mitmproxy>=12.2.1",
     "protobuf>=6.33.5",
+    "textual>=4.0.0",
 ]
 
 [build-system]

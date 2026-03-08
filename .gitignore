@@ -9,5 +9,6 @@ wheels/
 .mitmproxy/
 .mitm.pid
 *.log
+*.jsonl
 .python-version
 .cursor/

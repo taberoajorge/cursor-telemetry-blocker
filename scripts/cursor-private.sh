@@ -202,6 +202,12 @@ if ! kill -0 "$MITM_PID" 2>/dev/null; then
 fi
 echo "Proxy running (PID $MITM_PID)"
 
+if [ "${DASHBOARD:-}" = "1" ]; then
+    echo "Starting dashboard..."
+    uv run python -m cursor_telemetry_blocker &
+    DASHBOARD_PID=$!
+fi
+
 echo "Launching Cursor with proxy..."
 
 HTTP_PROXY="http://127.0.0.1:$PROXY_PORT" \

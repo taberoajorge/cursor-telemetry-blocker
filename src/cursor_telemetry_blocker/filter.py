@@ -3,6 +3,7 @@ from collections import Counter
 from mitmproxy import http
 
 from cursor_telemetry_blocker.config import (
+    EVENTS_FILE,
     LOG_FILES,
     classify_passthrough,
     create_logger,
@@ -11,11 +12,13 @@ from cursor_telemetry_blocker.config import (
     is_repo_tracking,
     is_sentry_envelope,
 )
+from cursor_telemetry_blocker.events import EventWriter, ProxyEvent
 
 
 class CursorTelemetryFilter:
     def __init__(self):
         self.logger = create_logger("cursor_blocker", LOG_FILES["block"])
+        self.events = EventWriter(EVENTS_FILE)
         self.blocked_count = 0
         self.passed_count = 0
         self.blocked_categories: Counter = Counter()
@@ -48,6 +51,17 @@ class CursorTelemetryFilter:
         self.passed_categories[classification] += 1
         self.logger.info(f"[PASS:{classification}] {flow.request.method} {full_url}")
 
+        request_size = len(flow.request.content) if flow.request.content else 0
+        self.events.emit(ProxyEvent(
+            event_type="passed",
+            category=classification.lower(),
+            host=host,
+            path=path,
+            method=flow.request.method,
+            size=request_size,
+            detail=f"pass:{classification}",
+        ))
+
     def done(self):
         self.logger.info("=" * 60)
         self.logger.info("SESSION SUMMARY")
@@ -63,13 +77,17 @@ class CursorTelemetryFilter:
         )
         self.logger.info(f"  Passed:  {self.passed_count} ({passed_detail})")
         self.logger.info("=" * 60)
+        self.events.close()
 
     def _block_request(self, flow: http.HTTPFlow, reason: str, category: str) -> None:
         self.blocked_count += 1
         self.blocked_categories[category] += 1
 
+        host = flow.request.pretty_host
+        path = flow.request.path
         content_type = flow.request.headers.get("content-type", "")
         is_grpc = "grpc" in content_type
+        request_size = len(flow.request.content) if flow.request.content else 0
 
         if is_grpc:
             flow.response = http.Response.make(
@@ -89,6 +107,15 @@ class CursorTelemetryFilter:
             )
 
         self.logger.info(f"[BLOCKED #{self.blocked_count}] {reason}")
+        self.events.emit(ProxyEvent(
+            event_type="blocked",
+            category=category,
+            host=host,
+            path=path,
+            method=flow.request.method,
+            size=request_size,
+            detail=reason,
+        ))
 
 
 addons = [CursorTelemetryFilter()]
