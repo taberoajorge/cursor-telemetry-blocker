@@ -31,6 +31,9 @@ class CursorDeepTelemetryFilter:
         self.passed_categories: Counter = Counter()
         self.logger.info("Cursor Deep Telemetry Filter started (with protobuf stripping)")
 
+    def responseheaders(self, flow: http.HTTPFlow) -> None:
+        flow.response.stream = True
+
     def request(self, flow: http.HTTPFlow) -> None:
         host = flow.request.pretty_host
         path = flow.request.path
@@ -45,7 +48,7 @@ class CursorDeepTelemetryFilter:
             self._block_request(flow, f"blocked gRPC path: {path}", "telemetry")
             return
 
-        if is_repo_tracking(path):
+        if is_repo_tracking(path, host):
             self._block_request(flow, f"blocked repo tracking: {path}", "repo")
             return
 

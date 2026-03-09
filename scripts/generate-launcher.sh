@@ -79,10 +79,11 @@ cd "${PROJECT_DIR}"
 exec ${MITMDUMP_BIN} \\
     --mode local:Cursor \\
     --set confdir="${CONFDIR}" \\
+    --allow-hosts "\\.cursor\\.sh" \\
     --scripts "${SHIM}" \\
     --quiet
 LAUNCHER_EOF
-        echo "Generated launcher: transparent mode (--mode local:Cursor) + deep filter shim"
+        echo "Generated launcher: transparent mode (--mode local:Cursor) + allow-hosts cursor.sh only"
     else
         echo "Warning: mitmdump does not support --mode local. Falling back to explicit proxy."
         PROXY_MODE="explicit"

@@ -52,13 +52,6 @@ REPO_TRACKING_MARKERS = [
     "/repository.v1.",
     "RepositoryService",
     "DashboardService/GetTeamRepos",
-    "DashboardService",
-]
-
-REPO_TRACKING_ALLOWLIST = [
-    "DashboardService/GetTeamPrivacyModeForced",
-    "DashboardService/GetUsageLimitStatusAndActiveGrants",
-    "DashboardService/GetTeamAdminSettingsOrEmptyIfNotInTeam",
 ]
 
 AI_PASSTHROUGH_MARKERS = [
@@ -132,8 +125,8 @@ def is_blocked_grpc_path(path: str) -> bool:
     return any(marker in path for marker in BLOCKED_GRPC_PATHS)
 
 
-def is_repo_tracking(path: str) -> bool:
-    if any(marker in path for marker in REPO_TRACKING_ALLOWLIST):
+def is_repo_tracking(path: str, host: str = "") -> bool:
+    if any(safe in host for safe in ("gitlab.com", "github.com", "bitbucket.org")):
         return False
     return any(marker in path for marker in REPO_TRACKING_MARKERS)
 

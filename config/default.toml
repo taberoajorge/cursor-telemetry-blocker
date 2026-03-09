@@ -54,13 +54,6 @@ repo_tracking = [
     "/repository.v1.",
     "RepositoryService",
     "DashboardService/GetTeamRepos",
-    "DashboardService",
-]
-
-repo_tracking_allowlist = [
-    "DashboardService/GetTeamPrivacyModeForced",
-    "DashboardService/GetUsageLimitStatusAndActiveGrants",
-    "DashboardService/GetTeamAdminSettingsOrEmptyIfNotInTeam",
 ]
 
 strip_repo = [

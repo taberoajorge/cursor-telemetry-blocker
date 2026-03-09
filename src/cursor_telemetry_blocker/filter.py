@@ -38,7 +38,7 @@ class CursorTelemetryFilter:
             self._block_request(flow, f"blocked gRPC path: {path}", "telemetry")
             return
 
-        if is_repo_tracking(path):
+        if is_repo_tracking(path, host):
             self._block_request(flow, f"blocked repo tracking: {path}", "repo")
             return
 

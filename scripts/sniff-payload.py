@@ -25,7 +25,6 @@ from cursor_telemetry_blocker.config import (  # noqa: E402
     is_repo_tracking,
     is_sentry_envelope,
     should_strip_repo,
-    REPO_TRACKING_ALLOWLIST,
 )
 
 WIRE_TYPE_VARINT = 0
