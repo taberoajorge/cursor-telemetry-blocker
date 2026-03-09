@@ -1,4 +1,11 @@
 #!/usr/bin/env bash
+# setup-system-proxy.sh — Configure macOS system proxy via PAC file.
+#
+# Sets the auto-proxy URL on active network services so that only
+# *.cursor.sh traffic routes through the local mitmproxy (port 18080).
+# All other traffic goes DIRECT — no performance impact.
+#
+# Usage: bash scripts/setup-system-proxy.sh [install|uninstall|status]
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -68,7 +75,13 @@ case "$ACTION" in
     uninstall)
         echo "Removing system proxy PAC configuration..."
 
-        for service in "Wi-Fi" "Ethernet" "Thunderbolt Ethernet Slot 0" "AX88179A" "AX88179B"; do
+        ALL_SERVICES="$(get_active_services)"
+        if [ -z "$ALL_SERVICES" ]; then
+            ALL_SERVICES="Wi-Fi|Ethernet"
+        fi
+
+        IFS='|' read -ra SERVICES <<< "$ALL_SERVICES"
+        for service in "${SERVICES[@]}"; do
             networksetup -setautoproxystate "$service" off 2>/dev/null || true
         done
 
@@ -76,7 +89,13 @@ case "$ACTION" in
         ;;
 
     status)
-        for service in "Wi-Fi" "Ethernet"; do
+        ALL_SERVICES="$(get_active_services)"
+        if [ -z "$ALL_SERVICES" ]; then
+            ALL_SERVICES="Wi-Fi|Ethernet"
+        fi
+
+        IFS='|' read -ra SERVICES <<< "$ALL_SERVICES"
+        for service in "${SERVICES[@]}"; do
             echo "=== $service ==="
             networksetup -getautoproxyurl "$service" 2>/dev/null || echo "  (not available)"
             echo ""

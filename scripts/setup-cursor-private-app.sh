@@ -1,4 +1,12 @@
 #!/usr/bin/env bash
+# setup-cursor-private-app.sh — Create a macOS .app wrapper for Cursor.
+#
+# Builds /Applications/CursorPrivate.app which:
+#   1. Closes any running Cursor instance
+#   2. Relaunches Cursor with proxy env vars (HTTP_PROXY, NODE_EXTRA_CA_CERTS)
+#   3. Uses the Cursor icon so it looks native in Dock/Spotlight
+#
+# Usage: bash scripts/setup-cursor-private-app.sh [install|uninstall]
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -16,6 +24,12 @@ fi
 ACTION="${1:-install}"
 
 build_app() {
+    if [ ! -d "/Applications/Cursor.app" ]; then
+        echo "Error: Cursor.app not found in /Applications."
+        echo "Install Cursor first: https://cursor.sh"
+        exit 1
+    fi
+
     echo "Building ${APP_NAME}.app..."
 
     mkdir -p "${APP_PATH}/Contents/MacOS"
