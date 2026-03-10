@@ -291,6 +291,8 @@ Configure a PAC-based system proxy so all Cursor traffic is routed through the b
 
 ```
 src/cursor_telemetry_blocker/
+  __init__.py              Package init
+  __main__.py              Dashboard CLI entry point
   config.py                Shared block lists, logger factory, classification
   events.py                Structured event emitter/reader (JSON lines)
   dashboard.py             Interactive TUI dashboard (Textual)
@@ -302,8 +304,14 @@ src/cursor_telemetry_blocker/
 scripts/
   cursor-private.sh        Main launcher (macOS + Linux)
   cursor-blocker-service.sh  LaunchAgent installer/manager
+  cursor-doctor.sh         Health check and auto-repair
+  generate-launcher.sh     Launcher script generator
   setup-ca-cert.sh         CA certificate installer
+  setup-cursor-private-app.sh  CursorPrivate.app builder
   setup-hosts.sh           Hosts file blocker
+  setup-system-proxy.sh    macOS system proxy (PAC file)
+  sniff-payload.py         Payload decoder for sniff mode
+  sniff-all.py             Full traffic sniffer with decode
 config/
   default.toml             Default block list configuration
 proto/
