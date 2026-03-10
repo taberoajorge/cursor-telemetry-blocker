@@ -30,6 +30,10 @@ class CursorTelemetryFilter:
         path = flow.request.path
         full_url = f"{host}{path}"
 
+        # Skip local traffic (agent/codex endpoints) — never filter localhost
+        if host in ("127.0.0.1", "localhost", "::1"):
+            return
+
         if is_blocked_domain(host):
             self._block_request(flow, f"blocked domain: {host}", "telemetry")
             return

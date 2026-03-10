@@ -38,6 +38,11 @@ class CursorDeepTelemetryFilter:
     def request(self, flow: http.HTTPFlow) -> None:
         host = flow.request.pretty_host
         path = flow.request.path
+
+        # Skip local traffic (agent/codex endpoints) — never filter localhost
+        if host in ("127.0.0.1", "localhost", "::1"):
+            return
+
         content_type = flow.request.headers.get("content-type", "")
         is_grpc = "grpc" in content_type
 

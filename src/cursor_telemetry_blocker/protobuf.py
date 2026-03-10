@@ -15,9 +15,11 @@ REQUEST_REPO_FIELD = 3
 
 # Patterns to redact from string fields during deep sanitization.
 _SENSITIVE_PATTERNS = [
-    re.compile(rb"/Users/[^/]+/"),       # macOS home paths
-    re.compile(rb"/home/[^/]+/"),         # Linux home paths
+    re.compile(rb"/Users/[^/]+/\S*"),     # macOS full paths (redact beyond home dir)
+    re.compile(rb"/home/[^/]+/\S*"),      # Linux full paths
+    re.compile(rb"C:\\Users\\[^\\]+\\\S*"),  # Windows full paths
     re.compile(rb"github\|user_\S+"),     # GitHub user identity tokens
+    re.compile(rb"https?://github\.com/[^\s\"']+"),  # GitHub repo URLs
 ]
 
 
@@ -47,7 +49,7 @@ def _redact_sensitive_bytes(raw: bytes) -> bytes:
     """Replace sensitive patterns in a byte string with redacted placeholders."""
     result = raw
     for pattern in _SENSITIVE_PATTERNS:
-        result = pattern.sub(b"[REDACTED]/", result)
+        result = pattern.sub(b"[REDACTED]", result)
     return result
 
 

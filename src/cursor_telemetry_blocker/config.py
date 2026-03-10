@@ -46,6 +46,8 @@ BLOCKED_GRPC_PATHS = [
     "TraceService/SubmitSpans",
     "AiService/ReportProcessMetricsV2",
     "ServerConfigService/GetServerConfig",
+    "GetSlackInstallUrl",
+    "/updates/api/update/",
     "/tev1/",
     "/rgstr",
 ]
