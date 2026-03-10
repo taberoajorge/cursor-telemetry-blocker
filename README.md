@@ -132,9 +132,17 @@ The installer wizard (`install.sh`) includes this as an interactive step.
 | `default.exp-tas.com` | Statsig experiment/feature flags |
 | `cursor-user-debugging-data.s3.us-east-1.amazonaws.com` | Debug data uploads |
 | `repo42.cursor.sh` | Codebase indexing uploads |
-| `api.turbopuffer.com` | Third-party embedding storage |
+| `api.turbopuffer.com` / `*.turbopuffer.com` | Third-party embedding storage |
 | `statsig.cursor.sh` | Statsig analytics |
+| `dc.services.visualstudio.com` | VS Code telemetry |
+| `snowplowprd.trx.gitlab.net` | GitLab Snowplow analytics |
+| `new-sentry.gitlab.net` | GitLab Sentry error reporting |
+| `otel.gitkraken.com` | GitKraken OpenTelemetry |
+| `xp.atlassian.com` | Atlassian experimentation |
+| `as.atlassian.com` | Atlassian analytics |
+| `api.agnost.ai` | Agnost AI telemetry |
 | `*.ingest.sentry.io` | Sentry error reporting |
+| `*.ingest.us.sentry.io` | Sentry US error reporting |
 
 ### gRPC Paths
 
@@ -142,13 +150,26 @@ The installer wizard (`install.sh`) includes this as an interactive step.
 |------|---------|
 | `ClientLoggerService` | Client logging |
 | `AnalyticsService/Batch` | Analytics batch |
+| `AnalyticsService/BootstrapStatsig` | Statsig bootstrap |
 | `AnalyticsService/Track` | Event tracking |
+| `AnalyticsService/SubmitLogs` | Log submission |
+| `AnalyticsService/UploadIssueTrace` | Issue trace uploads |
+| `MetricsService/ReportGauge` | Gauge metrics |
+| `MetricsService/ReportDistribution` | Distribution metrics |
+| `MetricsService/ReportIncrement` | Increment metrics |
+| `AiService/ReportClientNumericMetrics` | Client numeric metrics |
 | `AiService/ReportCommitAiAnalytics` | Commit analytics |
-| `AiService/ReportUsageEvent` | Usage events |
+| `AiService/ReportAiCodeChangeMetrics` | Code change metrics |
 | `AiService/UpdateVscodeProfile` | Profile updates |
+| `AiService/ReportUsageEvent` | Usage events |
+| `AiService/RecordTelemetry` | General telemetry |
+| `InAppAdService` | In-app advertisements |
 | `IndexerService` | Codebase indexing |
+| `CppService/RecordCppFate` | C++ extension telemetry |
+| `/tev1/` | Telemetry event endpoint |
+| `/rgstr` | Registration tracking |
 | `RepositoryService` | Repository tracking |
-| `DashboardService` | Dashboard analytics |
+| `DashboardService/GetTeamRepos` | Dashboard analytics |
 
 ### Deep Mode: Stripped from AI Requests
 
