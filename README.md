@@ -26,6 +26,10 @@ Cursor IDE sends telemetry data including metrics, analytics, repository names, 
 - [What Gets Blocked](#what-gets-blocked)
 - [How It Works](#how-it-works)
 - [Configuration](#configuration)
+- [CursorPrivate App (macOS)](#cursorprivate-app-macos)
+- [System Proxy (macOS)](#system-proxy-macos)
+- [Maintenance](#maintenance)
+- [Debug](#debug)
 - [Project Structure](#project-structure)
 - [Contributing](#contributing)
 - [License](#license)
@@ -248,6 +252,40 @@ For DNS-level blocking (works even without the proxy):
 ```bash
 make hosts
 ```
+
+## CursorPrivate App (macOS)
+
+A native macOS `.app` wrapper that launches Cursor with the proxy pre-configured. Open it from Spotlight like any other app.
+
+| Command | Description |
+|---------|-------------|
+| `make setup-app` | Build and install `CursorPrivate.app` in `/Applications` |
+| `make remove-app` | Remove `CursorPrivate.app` |
+
+## System Proxy (macOS)
+
+Configure a PAC-based system proxy so all Cursor traffic is routed through the blocker without environment variables.
+
+| Command | Description |
+|---------|-------------|
+| `make setup-proxy` | Install PAC file and configure macOS system proxy |
+| `make remove-proxy` | Remove system proxy configuration |
+
+## Maintenance
+
+| Command | Description |
+|---------|-------------|
+| `make doctor` | Health check — validates deps, certs, service, and config |
+| `make doctor-fix` | Health check with auto-repair for common issues |
+| `make repair` | Regenerate launcher script from config and restart service |
+| `make upgrade` | Pull latest code, repair, and run doctor |
+
+## Debug
+
+| Command | Description |
+|---------|-------------|
+| `make sniff` | Run in block mode with decoded payload logging |
+| `make dashboard-demo` | Launch dashboard with simulated events (no proxy needed) |
 
 ## Project Structure
 
