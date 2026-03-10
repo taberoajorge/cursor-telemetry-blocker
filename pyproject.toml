@@ -18,6 +18,11 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src/cursor_telemetry_blocker"]
 
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
+extraPaths = ["src"]
+
 [tool.ruff]
 target-version = "py312"
 line-length = 100
