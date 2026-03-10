@@ -45,6 +45,9 @@ analytics = [
     "InAppAdService",
     "IndexerService",
     "CppService/RecordCppFate",
+    "TraceService/SubmitSpans",
+    "AiService/ReportProcessMetricsV2",
+    "ServerConfigService/GetServerConfig",
     "/tev1/",
     "/rgstr",
 ]

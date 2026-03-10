@@ -43,6 +43,9 @@ BLOCKED_GRPC_PATHS = [
     "InAppAdService",
     "IndexerService",
     "CppService/RecordCppFate",
+    "TraceService/SubmitSpans",
+    "AiService/ReportProcessMetricsV2",
+    "ServerConfigService/GetServerConfig",
     "/tev1/",
     "/rgstr",
 ]

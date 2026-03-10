@@ -1,4 +1,5 @@
 import io
+import re
 import struct
 
 WIRE_TYPE_VARINT = 0
@@ -11,6 +12,13 @@ REPO_TRACKED_FIELD = 6
 
 REQUEST_WORKSPACE_PATH_FIELD = 5
 REQUEST_REPO_FIELD = 3
+
+# Patterns to redact from string fields during deep sanitization.
+_SENSITIVE_PATTERNS = [
+    re.compile(rb"/Users/[^/]+/"),       # macOS home paths
+    re.compile(rb"/home/[^/]+/"),         # Linux home paths
+    re.compile(rb"github\|user_\S+"),     # GitHub user identity tokens
+]
 
 
 def decode_varint(data: bytes, offset: int) -> tuple[int, int]:
@@ -33,6 +41,97 @@ def encode_varint(value: int) -> bytes:
         value >>= 7
     parts.append(value & 0x7F)
     return bytes(parts)
+
+
+def _redact_sensitive_bytes(raw: bytes) -> bytes:
+    """Replace sensitive patterns in a byte string with redacted placeholders."""
+    result = raw
+    for pattern in _SENSITIVE_PATTERNS:
+        result = pattern.sub(b"[REDACTED]/", result)
+    return result
+
+
+def sanitize_strings_deep(data: bytes, max_depth: int = 8) -> bytes:
+    """Recursively walk protobuf fields and redact sensitive string values.
+
+    Unlike strip_repo_info_from_protobuf which targets specific field numbers,
+    this scans ALL length-delimited fields at any nesting depth looking for
+    strings that match sensitive patterns (workspace paths, user identity).
+    """
+    if max_depth <= 0 or len(data) < 2:
+        return data
+
+    output = io.BytesIO()
+    offset = 0
+
+    while offset < len(data):
+        try:
+            tag, new_offset = decode_varint(data, offset)
+        except ValueError:
+            output.write(data[offset:])
+            break
+
+        field_number = tag >> 3
+        wire_type = tag & 0x07
+
+        if field_number == 0 or field_number > 536870911:
+            output.write(data[offset:])
+            break
+
+        if wire_type == WIRE_TYPE_VARINT:
+            _, end_offset = decode_varint(data, new_offset)
+            output.write(data[offset:end_offset])
+            offset = end_offset
+
+        elif wire_type == WIRE_TYPE_64BIT:
+            end_offset = new_offset + 8
+            output.write(data[offset:end_offset])
+            offset = end_offset
+
+        elif wire_type == WIRE_TYPE_32BIT:
+            end_offset = new_offset + 4
+            output.write(data[offset:end_offset])
+            offset = end_offset
+
+        elif wire_type == WIRE_TYPE_LENGTH_DELIMITED:
+            try:
+                length, content_offset = decode_varint(data, new_offset)
+            except ValueError:
+                output.write(data[offset:])
+                break
+
+            field_end = content_offset + length
+            if field_end > len(data):
+                output.write(data[offset:])
+                break
+
+            raw = data[content_offset:field_end]
+
+            # Try to decode as UTF-8 string — if it works, check for sensitive patterns
+            try:
+                text = raw.decode("utf-8", errors="strict")
+                if text.isprintable() or "\n" in text or "\t" in text:
+                    redacted = _redact_sensitive_bytes(raw)
+                    output.write(encode_varint(tag))
+                    output.write(encode_varint(len(redacted)))
+                    output.write(redacted)
+                    offset = field_end
+                    continue
+            except (UnicodeDecodeError, ValueError):
+                pass
+
+            # Not a string — try to recurse into it as a nested message
+            cleaned_sub = sanitize_strings_deep(raw, max_depth=max_depth - 1)
+            output.write(encode_varint(tag))
+            output.write(encode_varint(len(cleaned_sub)))
+            output.write(cleaned_sub)
+            offset = field_end
+
+        else:
+            output.write(data[offset:])
+            break
+
+    return output.getvalue()
 
 
 def strip_repo_info_from_protobuf(data: bytes) -> bytes:

@@ -16,6 +16,7 @@ from cursor_telemetry_blocker.events import EventWriter, ProxyEvent
 from cursor_telemetry_blocker.protobuf import (
     decode_grpc_frames,
     encode_grpc_frames,
+    sanitize_strings_deep,
     strip_repo_info_from_protobuf,
 )
 
@@ -113,6 +114,7 @@ class CursorDeepTelemetryFilter:
 
                 original_len = len(frame_data)
                 stripped_data = strip_repo_info_from_protobuf(frame_data)
+                stripped_data = sanitize_strings_deep(stripped_data)
                 modified_len = len(stripped_data)
 
                 if modified_len != original_len:
