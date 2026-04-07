@@ -49,6 +49,8 @@ analytics = [
     "AiService/ReportProcessMetricsV2",
     "ServerConfigService/GetServerConfig",
     "GetSlackInstallUrl",
+    "AiService/NameTab",
+    "OnlineMetricsService",
     "/updates/api/update/",
     "/tev1/",
     "/rgstr",
@@ -67,6 +69,7 @@ strip_repo = [
     "StreamChat",
     "GetChat",
     "GetPromptDryRun",
+    "FileSyncService",
 ]
 
 [passthrough]
@@ -82,6 +85,16 @@ ai = [
 auth = [
     "/auth/",
     "stripe",
+    "authenticate.cursor.sh",
+    "authenticator.cursor.sh",
+]
+
+[cursor_domains]
+api = [
+    "api2.cursor.sh",
+    "api3.cursor.sh",
+    "api4.cursor.sh",
+    "marketplace.cursorapi.com",
     "authenticate.cursor.sh",
     "authenticator.cursor.sh",
 ]
