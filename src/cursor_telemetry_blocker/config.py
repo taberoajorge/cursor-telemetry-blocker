@@ -47,6 +47,8 @@ BLOCKED_GRPC_PATHS = [
     "AiService/ReportProcessMetricsV2",
     "ServerConfigService/GetServerConfig",
     "GetSlackInstallUrl",
+    "AiService/NameTab",
+    "OnlineMetricsService",
     "/updates/api/update/",
     "/tev1/",
     "/rgstr",
@@ -81,11 +83,13 @@ GRPC_PATHS_TO_STRIP_REPO = [
     "StreamChat",
     "GetChat",
     "GetPromptDryRun",
+    "FileSyncService",
 ]
 
 CURSOR_DOMAINS = {
     "api2.cursor.sh",
     "api3.cursor.sh",
+    "api4.cursor.sh",
     "marketplace.cursorapi.com",
     "authenticate.cursor.sh",
     "authenticator.cursor.sh",

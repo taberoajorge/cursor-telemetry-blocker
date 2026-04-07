@@ -15,11 +15,13 @@ REQUEST_REPO_FIELD = 3
 
 # Patterns to redact from string fields during deep sanitization.
 _SENSITIVE_PATTERNS = [
-    re.compile(rb"/Users/[^/]+/\S*"),     # macOS full paths (redact beyond home dir)
-    re.compile(rb"/home/[^/]+/\S*"),      # Linux full paths
-    re.compile(rb"C:\\Users\\[^\\]+\\\S*"),  # Windows full paths
-    re.compile(rb"github\|user_\S+"),     # GitHub user identity tokens
-    re.compile(rb"https?://github\.com/[^\s\"']+"),  # GitHub repo URLs
+    re.compile(rb"/Users/[^/]+/\S*"),
+    re.compile(rb"/home/[^/]+/\S*"),
+    re.compile(rb"C:\\Users\\[^\\]+\\\S*"),
+    re.compile(rb"/Applications/[^\s\"']+"),
+    re.compile(rb"/opt/[^\s\"']+"),
+    re.compile(rb"github\|user_\S+"),
+    re.compile(rb"https?://github\.com/[^\s\"']+"),
 ]
 
 
@@ -127,6 +129,107 @@ def sanitize_strings_deep(data: bytes, max_depth: int = 8) -> bytes:
             output.write(encode_varint(tag))
             output.write(encode_varint(len(cleaned_sub)))
             output.write(cleaned_sub)
+            offset = field_end
+
+        else:
+            output.write(data[offset:])
+            break
+
+    return output.getvalue()
+
+
+ENDPOINT_STRIP_FIELDS: dict[str, set[tuple[int, ...]]] = {
+    "RefreshTabContext": {
+        (1, 1),
+        (5, 1),
+    },
+    "WriteGitCommitMessage": {
+        (3, 3, 1),
+        (3, 3, 7),
+        (3, 5, 1),
+        (3, 5, 2),
+    },
+}
+
+
+def _extract_endpoint_name(path: str) -> str:
+    return path.rsplit("/", 1)[-1] if "/" in path else path
+
+
+def strip_fields_by_path(data: bytes, field_paths: set[tuple[int, ...]]) -> bytes:
+    top_fields: dict[int, set[tuple[int, ...]]] = {}
+    terminal_fields: set[int] = set()
+
+    for path in field_paths:
+        first = path[0]
+        if len(path) == 1:
+            terminal_fields.add(first)
+        else:
+            top_fields.setdefault(first, set()).add(path[1:])
+
+    output = io.BytesIO()
+    offset = 0
+
+    while offset < len(data):
+        try:
+            tag, new_offset = decode_varint(data, offset)
+        except ValueError:
+            output.write(data[offset:])
+            break
+
+        field_number = tag >> 3
+        wire_type = tag & 0x07
+
+        if field_number == 0 or field_number > 536870911:
+            output.write(data[offset:])
+            break
+
+        if wire_type == WIRE_TYPE_VARINT:
+            _, end_offset = decode_varint(data, new_offset)
+            output.write(data[offset:end_offset])
+            offset = end_offset
+
+        elif wire_type == WIRE_TYPE_64BIT:
+            end_offset = new_offset + 8
+            output.write(data[offset:end_offset])
+            offset = end_offset
+
+        elif wire_type == WIRE_TYPE_32BIT:
+            end_offset = new_offset + 4
+            output.write(data[offset:end_offset])
+            offset = end_offset
+
+        elif wire_type == WIRE_TYPE_LENGTH_DELIMITED:
+            try:
+                length, content_offset = decode_varint(data, new_offset)
+            except ValueError:
+                output.write(data[offset:])
+                break
+
+            field_end = content_offset + length
+            if field_end > len(data):
+                output.write(data[offset:])
+                break
+
+            raw = data[content_offset:field_end]
+
+            if field_number in terminal_fields:
+                redacted = b"[REDACTED]"
+                output.write(encode_varint(tag))
+                output.write(encode_varint(len(redacted)))
+                output.write(redacted)
+                offset = field_end
+                continue
+
+            if field_number in top_fields:
+                cleaned = strip_fields_by_path(raw, top_fields[field_number])
+                output.write(encode_varint(tag))
+                output.write(encode_varint(len(cleaned)))
+                output.write(cleaned)
+                offset = field_end
+                continue
+
+            output.write(data[offset:field_end])
             offset = field_end
 
         else:
